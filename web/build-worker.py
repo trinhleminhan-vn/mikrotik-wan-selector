@@ -51,7 +51,14 @@ export default {
     const url = new URL(request.url);
     const p = url.pathname.replace(/\\/+$/, '');      // bỏ dấu / thừa ở cuối
 
-    if (p !== BASE) return fetch(request);           // không phải của mình -> trả về site
+    // Route cua Cloudflare khop ca /BASE lan /BASE/*, nen phai tu don duong dan.
+    // Duong dan phu -> 301 ve dia chi chuan, khoi bi coi la trung noi dung.
+    if (p !== BASE) {
+      if (url.pathname.startsWith(BASE + '/')) {
+        return Response.redirect(url.origin + BASE, 301);
+      }
+      return fetch(request);                         // khong phai cua minh -> tra ve site
+    }
 
     if (request.method === 'HEAD') {
       return new Response(null, { headers: headers() });
@@ -86,6 +93,7 @@ compatibility_date = "2026-01-01"
 # Muốn gỡ thì xoá route trong dashboard, hoặc `npx wrangler delete`.
 routes = [
   { pattern = "%(zone)s%(base)s", zone_name = "%(zone)s" },
+  { pattern = "%(zone)s%(base)s/*", zone_name = "%(zone)s" },
 ]
 '''
 
