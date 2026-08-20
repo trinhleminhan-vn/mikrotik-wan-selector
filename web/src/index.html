@@ -3,8 +3,59 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tự dựng nút chọn nhà mạng cho MikroTik</title>
-<meta name="description" content="Dán hiện trạng router vào, nhận lại đoạn lệnh RouterOS và app bấm nút cho máy người dùng. Chạy hoàn toàn trong trình duyệt, không gửi gì đi đâu.">
+<title>Tự dựng nút chọn nhà mạng cho MikroTik hai đường WAN</title>
+<meta name="description" content="Dán hiện trạng router vào, nhận lại đoạn lệnh RouterOS và app bấm nút cho máy người dùng. Chạy hoàn toàn trong trình duyệt, không gửi cấu hình router đi đâu.">
+<link rel="canonical" href="https://trinhleminhan.com/tools/mikrotik-wan-selector">
+<meta name="author" content="Trịnh Lê Minh An">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#6fae8e">
+<meta name="keywords" content="MikroTik, RouterOS, multi WAN, chọn nhà mạng, policy routing, VRRP, PPPoE, cân bằng tải">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Trịnh Lê Minh An">
+<meta property="og:locale" content="vi_VN">
+<meta property="og:url" content="https://trinhleminhan.com/tools/mikrotik-wan-selector">
+<meta property="og:title" content="Tự dựng nút chọn nhà mạng cho MikroTik hai đường WAN">
+<meta property="og:description" content="Dán hiện trạng router vào, nhận lại đoạn lệnh RouterOS và app bấm nút cho máy người dùng. Chạy hoàn toàn trong trình duyệt.">
+<meta property="og:image" content="https://trinhleminhan.com/api/upload/up-a377c1623b084dc4.png">
+<meta property="og:image:alt" content="Giao diện app chọn nhà mạng trên máy người dùng">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tự dựng nút chọn nhà mạng cho MikroTik hai đường WAN">
+<meta name="twitter:description" content="Dán hiện trạng router vào, nhận lại đoạn lệnh RouterOS và app bấm nút cho máy người dùng.">
+<meta name="twitter:image" content="https://trinhleminhan.com/api/upload/up-a377c1623b084dc4.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "@id": "https://trinhleminhan.com/tools/mikrotik-wan-selector#app",
+      "name": "Tự dựng nút chọn nhà mạng cho MikroTik",
+      "url": "https://trinhleminhan.com/tools/mikrotik-wan-selector",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Trình duyệt web",
+      "inLanguage": "vi-VN",
+      "description": "Sinh cấu hình RouterOS để mỗi máy trong LAN tự chọn đường WAN, và đóng gói sẵn app bấm nút cho máy người dùng. Chạy hoàn toàn trong trình duyệt.",
+      "image": "https://trinhleminhan.com/api/upload/up-a377c1623b084dc4.png",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "VND" },
+      "author": { "@type": "Person", "name": "Trịnh Lê Minh An", "url": "https://trinhleminhan.com/gioi-thieu/" },
+      "isPartOf": { "@type": "WebSite", "name": "Trịnh Lê Minh An", "url": "https://trinhleminhan.com/" },
+      "license": "https://opensource.org/licenses/MIT",
+      "softwareHelp": "https://github.com/trinhleminhan-vn/mikrotik-wan-selector"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://trinhleminhan.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Công cụ", "item": "https://trinhleminhan.com/tools/" },
+        { "@type": "ListItem", "position": 3, "name": "Chọn nhà mạng cho MikroTik" }
+      ]
+    }
+  ]
+}
+</script>
 <style>
   :root{
     --bg:#faf8f5; --card:#fff; --ink:#3d3a36; --muted:#6b6660; --faint:#a09a92;
@@ -60,6 +111,10 @@
   .pill{display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.78rem;
         background:var(--code);color:var(--muted);border:1px solid var(--line)}
   .ok{color:var(--accent-dark);font-weight:600}
+  .crumb{font-size:.86rem;color:var(--faint);margin:0 0 .4rem}
+  .crumb a{color:var(--faint);text-decoration:none}
+  .crumb a:hover{color:var(--accent-dark);text-decoration:underline}
+  .crumb span{margin:0 .25rem}
   .foot{margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid var(--line);
         font-size:.88rem;color:var(--faint);text-align:center}
   .chk{display:flex;gap:.45rem;align-items:center;font-size:.9rem;color:var(--muted)}
@@ -72,6 +127,12 @@
 </head>
 <body>
 <div class="wrap">
+
+  <nav class="crumb" aria-label="Đường dẫn">
+    <a href="/">Trang chủ</a> <span>/</span>
+    <a href="/tools/">Công cụ</a> <span>/</span>
+    <span>Chọn nhà mạng cho MikroTik</span>
+  </nav>
 
   <h1>Tự dựng nút chọn nhà mạng cho MikroTik</h1>
   <p class="lead">Router có từ hai đường WAN trở lên thì bình thường nó tự chia tải, máy con không xen vô được.

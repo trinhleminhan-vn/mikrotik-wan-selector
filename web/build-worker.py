@@ -17,6 +17,7 @@ Vì sao đi đường Worker chứ không thêm file vào source website:
 """
 from __future__ import annotations
 
+import datetime
 import pathlib
 import sys
 
@@ -43,6 +44,7 @@ WORKER = '''// Sinh tự động bởi web/build-worker.py — đừng sửa tay
 // cho origin y nguyên, nên gắn vào tên miền đang chạy cũng không ảnh hưởng gì.
 
 const BASE = %(base)r;
+const LASTMOD = %(lastmod)r;
 
 const HTML = `%(html)s`;
 
@@ -50,6 +52,10 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     const p = url.pathname.replace(/\\/+$/, '');      // bỏ dấu / thừa ở cuối
+
+    // sitemap.xml do site sinh ra, Worker chỉ chèn thêm đúng một dòng. Lấy bản
+    // gốc trước; hỏng hay không phải XML thì trả nguyên si, không phá của ai.
+    if (p === '/sitemap.xml') return patchSitemap(request);
 
     // Route cua Cloudflare khop ca /BASE lan /BASE/*, nen phai tu don duong dan.
     // Duong dan phu -> 301 ve dia chi chuan, khoi bi coi la trung noi dung.
@@ -69,6 +75,28 @@ export default {
     return new Response(HTML, { headers: headers() });
   },
 };
+
+async function patchSitemap(request) {
+  const res = await fetch(request);
+  const ct = res.headers.get('content-type') || '';
+  if (!res.ok || !ct.includes('xml')) return res;
+
+  const xml = await res.text();
+  const loc = 'https://' + new URL(request.url).host + BASE;
+  if (xml.includes(loc) || !xml.includes('</urlset>')) return xmlResponse(xml, res);
+
+  const entry = '  <url><loc>' + loc + '</loc>' +
+                '<lastmod>' + LASTMOD + '</lastmod>' +
+                '<changefreq>monthly</changefreq><priority>0.8</priority></url>\\n';
+  return xmlResponse(xml.replace('</urlset>', entry + '</urlset>'), res);
+}
+
+function xmlResponse(body, src) {
+  const h = new Headers(src.headers);
+  h.delete('content-length');                       // đã đổi độ dài
+  h.set('content-type', 'application/xml; charset=utf-8');
+  return new Response(body, { status: src.status, headers: h });
+}
 
 function headers() {
   return {
@@ -94,6 +122,9 @@ compatibility_date = "2026-01-01"
 routes = [
   { pattern = "%(zone)s%(base)s", zone_name = "%(zone)s" },
   { pattern = "%(zone)s%(base)s/*", zone_name = "%(zone)s" },
+  # Chỉ để chèn thêm một dòng <url> vào sitemap do site sinh ra.
+  # Lấy bản gốc rồi sửa; site trả lỗi hay không phải XML thì trả nguyên si.
+  { pattern = "%(zone)s/sitemap.xml", zone_name = "%(zone)s" },
 ]
 '''
 
@@ -106,7 +137,10 @@ def main() -> int:
     html = DIST.read_text(encoding="utf-8")
     (OUT / "src").mkdir(parents=True, exist_ok=True)
 
-    worker = WORKER % {"base": BASE_PATH, "html": js_template_literal(html)}
+    # Ngày cập nhật lấy từ chính file đã dựng, khỏi phải sửa tay mỗi lần.
+    lastmod = datetime.date.fromtimestamp(DIST.stat().st_mtime).isoformat()
+    worker = WORKER % {"base": BASE_PATH, "lastmod": lastmod,
+                       "html": js_template_literal(html)}
     (OUT / "src" / "worker.js").write_text(worker, encoding="utf-8")
     (OUT / "wrangler.toml").write_text(
         TOML % {"name": WORKER_NAME, "zone": ZONE, "base": BASE_PATH}, encoding="utf-8")
