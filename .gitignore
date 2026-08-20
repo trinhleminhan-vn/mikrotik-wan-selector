@@ -8,3 +8,8 @@ __pycache__/
 *.pyc
 cauhinh*.yaml
 !examples/*.yaml
+
+# Cloudflare Worker: bo dau ra da sinh, chay web/build-worker.py de tao lai
+web/worker/src/worker.js
+web/worker/.wrangler/
+node_modules/

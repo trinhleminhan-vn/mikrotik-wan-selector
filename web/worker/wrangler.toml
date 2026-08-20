@@ -1,0 +1,9 @@
+name = "mikrotik-wan-selector"
+main = "src/worker.js"
+compatibility_date = "2026-01-01"
+
+# Route hẹp: chỉ nhánh này chạy qua Worker, còn lại về site như cũ.
+# Muốn gỡ thì xoá route trong dashboard, hoặc `npx wrangler delete`.
+routes = [
+  { pattern = "trinhleminhan.com/tools/mikrotik-wan-selector", zone_name = "trinhleminhan.com" },
+]
