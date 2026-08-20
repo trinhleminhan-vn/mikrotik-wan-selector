@@ -1,29 +1,34 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tự dựng nút chọn nhà mạng cho MikroTik hai đường WAN</title>
-<meta name="description" content="Dán hiện trạng router vào, nhận lại đoạn lệnh RouterOS và app bấm nút cho máy người dùng. Chạy hoàn toàn trong trình duyệt, không gửi cấu hình router đi đâu.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đổi nhà mạng cho từng máy khi router MikroTik có 2 line Internet</title>
+<meta name="description" content="Phòng net, quán game hay văn phòng có 2 đường mạng: dựng nút cho từng máy tự chọn đi Viettel hay VNPT. Dán hiện trạng router vào, nhận lệnh RouterOS và app bấm nút. Chạy PPPoE, DHCP hay IP tĩnh đều được.">
 <link rel="canonical" href="https://trinhleminhan.com/tools/mikrotik-wan-selector">
 <meta name="author" content="Trịnh Lê Minh An">
 <meta name="robots" content="index, follow, max-image-preview:large">
-<meta name="theme-color" content="#6fae8e">
-<meta name="keywords" content="MikroTik, RouterOS, multi WAN, chọn nhà mạng, policy routing, VRRP, PPPoE, cân bằng tải">
+<meta name="theme-color" content="#c4533d">
+<meta name="keywords" content="MikroTik 2 line mạng, đổi nhà mạng trên từng máy, phòng net 2 đường truyền, multi WAN MikroTik, policy routing RouterOS, chia line phòng game, load balance 2 mạng">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Trịnh Lê Minh An">
 <meta property="og:locale" content="vi_VN">
 <meta property="og:url" content="https://trinhleminhan.com/tools/mikrotik-wan-selector">
-<meta property="og:title" content="Tự dựng nút chọn nhà mạng cho MikroTik hai đường WAN">
-<meta property="og:description" content="Dán hiện trạng router vào, nhận lại đoạn lệnh RouterOS và app bấm nút cho máy người dùng. Chạy hoàn toàn trong trình duyệt.">
+<meta property="og:title" content="Đổi nhà mạng cho từng máy khi router MikroTik có 2 line Internet">
+<meta property="og:description" content="Dựng nút cho từng máy tự chọn đi Viettel hay VNPT. Dán hiện trạng router vào, nhận lệnh RouterOS và app bấm nút cho máy con.">
 <meta property="og:image" content="https://trinhleminhan.com/api/upload/up-a377c1623b084dc4.png">
 <meta property="og:image:alt" content="Giao diện app chọn nhà mạng trên máy người dùng">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Tự dựng nút chọn nhà mạng cho MikroTik hai đường WAN">
-<meta name="twitter:description" content="Dán hiện trạng router vào, nhận lại đoạn lệnh RouterOS và app bấm nút cho máy người dùng.">
+<meta name="twitter:title" content="Đổi nhà mạng cho từng máy khi router MikroTik có 2 line Internet">
+<meta name="twitter:description" content="Dựng nút cho từng máy tự chọn đi Viettel hay VNPT, ngay trong trình duyệt.">
 <meta name="twitter:image" content="https://trinhleminhan.com/api/upload/up-a377c1623b084dc4.png">
+
+<link rel="icon" type="image/png" href="/images/logo/Favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0"></script>
+<link rel="stylesheet" href="/css/style.css?v=20260504k">
 
 <script type="application/ld+json">
 {
@@ -32,7 +37,7 @@
     {
       "@type": "WebApplication",
       "@id": "https://trinhleminhan.com/tools/mikrotik-wan-selector#app",
-      "name": "Tự dựng nút chọn nhà mạng cho MikroTik",
+      "name": "Chọn nhà mạng cho MikroTik nhiều đường WAN",
       "url": "https://trinhleminhan.com/tools/mikrotik-wan-selector",
       "applicationCategory": "UtilitiesApplication",
       "operatingSystem": "Trình duyệt web",
@@ -52,217 +57,370 @@
         { "@type": "ListItem", "position": 2, "name": "Công cụ", "item": "https://trinhleminhan.com/tools/" },
         { "@type": "ListItem", "position": 3, "name": "Chọn nhà mạng cho MikroTik" }
       ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "Router chỉ chạy PPPoE mới dùng được hay DHCP cũng được?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Kiểu nào cũng được. Trang dò đường WAN theo bảng default route của router, nên PPPoE, DHCP client, IP tĩnh, hay WAN cắm sau modem nhà mạng đang NAT (WAN mang IP nội bộ) đều nhận ra. Với WAN ethernet, lệnh sinh ra trỏ thẳng vào IP next-hop; với PPPoE thì trỏ tên interface." } },
+        { "@type": "Question", "name": "Có phải cài gì lên máy con không?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Không cài. Máy con chỉ đổi default gateway. Trang đóng gói sẵn một app bấm nút cho Windows và macOS/Linux, chép cả thư mục sang là chạy, không cần cài đặt." } },
+        { "@type": "Question", "name": "Máy nào không mở app thì sao?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Chạy y như cũ. Cấu hình sinh ra chỉ thêm gateway mới, không đụng vào hành vi mặc định của router, nên máy không đổi gateway vẫn đi theo đường router đang chia." } },
+        { "@type": "Question", "name": "Máy nằm sau bộ phát Wi-Fi riêng có chọn được không?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Không. Bộ phát Wi-Fi có NAT gộp cả cụm thành một địa chỉ nguồn, MikroTik chỉ thấy đúng một máy. Cách xử lý là chuyển bộ phát đó sang chế độ Bridge hoặc Access Point, hoặc ghim cả cụm vào một nhà mạng cố định." } },
+        { "@type": "Question", "name": "Cấu hình router hiện tại có bị mất không?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Không. Lệnh sinh ra chỉ thêm đối tượng mới mang một nhãn riêng, và có sẵn đoạn lệnh gỡ bỏ để trả router về đúng như trước. Vẫn nên sao lưu router trước khi dán." } },
+        { "@type": "Question", "name": "Dữ liệu router của tôi có bị gửi đi đâu không?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Không. Toàn bộ việc đọc cấu hình, sinh lệnh và đóng gói app đều chạy bằng JavaScript ngay trong trình duyệt của bạn. Không có máy chủ nào nhận dữ liệu router, và trang cũng không lưu lại gì." } }
+      ]
     }
   ]
 }
 </script>
+
 <style>
+  /* Chỉ CSS riêng của trang. Màu, font, bo góc, đổ bóng đều lấy biến của site
+     trong /css/style.css nên đổi theme site là trang này đổi theo. */
   :root{
-    --bg:#faf8f5; --card:#fff; --ink:#3d3a36; --muted:#6b6660; --faint:#a09a92;
-    --line:#e8e3dc; --accent:#6fae8e; --accent-dark:#5f9b7c; --err:#c84b4b;
-    --warn:#b8863b; --code:#f4f1ec;
+    /* Bản dự phòng: mở file rời không có style.css thì vẫn ra đúng tông */
+    --primary-color:#c4533d; --primary-dark:#9e3e2c; --primary-bg:#fde8e0;
+    --accent-color:#6f8f5c; --secondary-color:#b8417a;
+    --dark-color:#1f1812; --light-color:#fff4e6; --paper:#fff;
+    --text-color:#1f1812; --text-light:#54493d; --text-muted:#8a7d6e;
+    --border-color:#f0e0cf; --border-radius:14px; --border-radius-lg:22px;
+    --shadow-card:0 4px 12px rgba(60,40,20,.06),0 1px 3px rgba(60,40,20,.04);
+    --shadow-md:0 8px 24px rgba(60,40,20,.10);
+    --font-primary:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --font-display:'Playfair Display','Be Vietnam Pro',Georgia,serif;
+    --font-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.7;
-       font-family:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',sans-serif;
-       padding:1.5rem 1rem 5rem}
-  .wrap{max-width:880px;margin:0 auto}
-  h1{font-family:Lora,Georgia,serif;font-size:1.9rem;line-height:1.3;margin:.2rem 0 .6rem}
-  h2{font-family:Lora,Georgia,serif;font-size:1.25rem;margin:0 0 .2rem}
-  p{margin:0 0 .9rem;color:var(--muted)}
-  a{color:var(--accent-dark)}
-  .lead{font-size:1.02rem}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
-        padding:1.4rem 1.3rem;margin:1.1rem 0;box-shadow:0 6px 24px -18px rgba(0,0,0,.3)}
-  .step{display:flex;gap:.7rem;align-items:baseline;margin-bottom:.7rem}
-  .num{flex:0 0 1.9rem;height:1.9rem;border-radius:50%;background:var(--accent);color:#fff;
-       display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem}
-  .note{background:#eef5f1;border-left:3px solid var(--accent);padding:.7rem .9rem;
-        border-radius:0 8px 8px 0;font-size:.93rem;color:var(--muted);margin:.8rem 0}
-  .warnbox{background:#fdf6ea;border-left:3px solid var(--warn);padding:.7rem .9rem;
-           border-radius:0 8px 8px 0;font-size:.93rem;margin:.8rem 0}
-  .errbox{background:#fdeeee;border-left:3px solid var(--err);padding:.7rem .9rem;
-          border-radius:0 8px 8px 0;font-size:.93rem;margin:.8rem 0;color:#8a3535}
-  pre,code,textarea,.mono{font-family:ui-monospace,'Cascadia Mono',Consolas,monospace}
-  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;
-      padding:.9rem;overflow-x:auto;font-size:.82rem;line-height:1.55;margin:.6rem 0;
-      max-height:26rem;overflow-y:auto;white-space:pre}
-  textarea{width:100%;min-height:9rem;padding:.8rem;border:1px solid var(--line);
-           border-radius:10px;font-size:.82rem;background:#fff;color:var(--ink);resize:vertical}
-  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--accent)}
-  input[type=text],input[type=number],select{padding:.5rem .65rem;border:1px solid var(--line);
-      border-radius:8px;font-family:inherit;font-size:.93rem;background:#fff;color:var(--ink);width:100%}
-  input[type=color]{width:2.6rem;height:2.1rem;padding:2px;border:1px solid var(--line);
-      border-radius:6px;background:#fff;cursor:pointer}
-  button{padding:.6rem 1.05rem;border:0;border-radius:9px;background:var(--accent);color:#fff;
-         font-family:inherit;font-weight:600;font-size:.94rem;cursor:pointer}
-  button:hover{background:var(--accent-dark)}
-  button:disabled{background:#cfcac3;cursor:not-allowed}
-  button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
-  button.ghost:hover{background:var(--code)}
-  button.sm{padding:.35rem .7rem;font-size:.85rem}
-  .row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
-  table{width:100%;border-collapse:collapse;font-size:.92rem;margin:.5rem 0}
-  th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:middle}
-  th{font-size:.82rem;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.8rem}
-  label.f{display:block;font-size:.85rem;color:var(--muted);margin-bottom:.25rem}
+  body{background:var(--light-color);color:var(--text-color);font-family:var(--font-primary)}
+
+  .wan-wrap{max-width:900px;margin:0 auto}
+  .wan-crumb{font-size:.86rem;color:var(--text-muted);margin-bottom:.6rem}
+  .wan-crumb a{color:var(--text-muted);text-decoration:none}
+  .wan-crumb a:hover{color:var(--primary-color);text-decoration:underline}
+  .wan-crumb span{margin:0 .3rem}
+
+  .wan-card{background:var(--paper);border:1px solid var(--border-color);
+    border-radius:var(--border-radius-lg);padding:1.6rem 1.5rem;margin:1.2rem 0;
+    box-shadow:var(--shadow-card)}
+  .wan-step{display:flex;gap:.85rem;align-items:flex-start;margin-bottom:.9rem}
+  .wan-num{flex:0 0 2rem;height:2rem;border-radius:50%;background:var(--primary-color);
+    color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem}
+  .wan-card h2{font-family:var(--font-display);font-size:1.35rem;margin:0 0 .25rem;color:var(--dark-color)}
+  .wan-card h3{font-size:1rem;margin:1.4rem 0 .35rem;color:var(--dark-color)}
+  .wan-card p{margin:0 0 .8rem;color:var(--text-light)}
+
+  .wan-note{background:var(--primary-bg);border-left:3px solid var(--primary-color);
+    padding:.8rem 1rem;border-radius:0 10px 10px 0;font-size:.93rem;color:var(--text-light);margin:.9rem 0}
+  .wan-warn{background:#fdf4e3;border-left:3px solid #d19a3d;padding:.8rem 1rem;
+    border-radius:0 10px 10px 0;font-size:.93rem;margin:.9rem 0;color:var(--text-light)}
+  .wan-err{background:#fdecea;border-left:3px solid #c0392b;padding:.8rem 1rem;
+    border-radius:0 10px 10px 0;font-size:.93rem;margin:.9rem 0;color:#8a2f24}
+
+  .wan-wrap pre{background:#2b211a;color:#f3e6d8;border:0;border-radius:12px;padding:1rem;
+    overflow:auto;font-family:var(--font-mono);font-size:.8rem;line-height:1.6;
+    margin:.7rem 0;max-height:26rem;white-space:pre}
+  .wan-wrap textarea{width:100%;min-height:9rem;padding:.85rem;border:1px solid var(--border-color);
+    border-radius:12px;font-family:var(--font-mono);font-size:.8rem;background:#fff;
+    color:var(--text-color);resize:vertical}
+  .wan-wrap textarea:focus,.wan-wrap input:focus,.wan-wrap select:focus{outline:none;border-color:var(--primary-color)}
+  .wan-wrap input[type=text],.wan-wrap input[type=number],.wan-wrap select{
+    padding:.55rem .7rem;border:1px solid var(--border-color);border-radius:10px;
+    font-family:inherit;font-size:.93rem;background:#fff;color:var(--text-color);width:100%}
+  .wan-wrap input[type=color]{width:2.7rem;height:2.2rem;padding:2px;border:1px solid var(--border-color);
+    border-radius:8px;background:#fff;cursor:pointer}
+  .wan-btn{padding:.62rem 1.15rem;border:0;border-radius:10px;background:var(--primary-color);
+    color:#fff;font-family:inherit;font-weight:600;font-size:.94rem;cursor:pointer}
+  .wan-btn:hover{background:var(--primary-dark)}
+  .wan-btn.ghost{background:#fff;color:var(--text-color);border:1px solid var(--border-color)}
+  .wan-btn.ghost:hover{background:var(--light-color)}
+  .wan-btn.sm{padding:.36rem .75rem;font-size:.85rem}
+  .wan-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+  .wan-wrap table{width:100%;border-collapse:collapse;font-size:.92rem;margin:.6rem 0}
+  .wan-wrap th,.wan-wrap td{text-align:left;padding:.5rem .55rem;border-bottom:1px solid var(--border-color);vertical-align:middle}
+  .wan-wrap th{font-size:.78rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .wan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:.85rem}
+  .wan-lab{display:block;font-size:.84rem;color:var(--text-muted);margin-bottom:.25rem}
   .hidden{display:none}
-  .pill{display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.78rem;
-        background:var(--code);color:var(--muted);border:1px solid var(--line)}
-  .ok{color:var(--accent-dark);font-weight:600}
-  .crumb{font-size:.86rem;color:var(--faint);margin:0 0 .4rem}
-  .crumb a{color:var(--faint);text-decoration:none}
-  .crumb a:hover{color:var(--accent-dark);text-decoration:underline}
-  .crumb span{margin:0 .25rem}
-  .foot{margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid var(--line);
-        font-size:.88rem;color:var(--faint);text-align:center}
-  .chk{display:flex;gap:.45rem;align-items:center;font-size:.9rem;color:var(--muted)}
-  .chk input{width:auto}
-  .tabs{display:flex;gap:.4rem;margin:.6rem 0 0;flex-wrap:wrap}
-  .tabs button{background:#fff;color:var(--muted);border:1px solid var(--line);font-weight:500}
-  .tabs button[aria-selected=true]{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
-  @media (max-width:560px){ body{padding:1rem .7rem 4rem} h1{font-size:1.5rem} }
+  .wan-pill{display:inline-block;padding:.12rem .55rem;border-radius:999px;font-size:.76rem;
+    background:var(--light-color);color:var(--text-muted);border:1px solid var(--border-color)}
+  .wan-ok{color:var(--accent-color);font-weight:700}
+  .wan-chk{display:flex;gap:.45rem;align-items:center;font-size:.9rem;color:var(--text-light)}
+  .wan-chk input{width:auto}
+  .wan-tabs{display:flex;gap:.4rem;margin:.7rem 0 0;flex-wrap:wrap}
+  .wan-tabs button{background:#fff;color:var(--text-muted);border:1px solid var(--border-color);
+    font-weight:500;padding:.5rem 1rem;border-radius:10px;cursor:pointer;font-family:inherit;font-size:.9rem}
+  .wan-tabs button[aria-selected=true]{background:var(--primary-color);color:#fff;border-color:var(--primary-color);font-weight:700}
+  .wan-shot{width:100%;max-width:420px;border-radius:14px;border:1px solid var(--border-color);
+    box-shadow:var(--shadow-md);display:block}
+  .wan-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.4rem;align-items:start}
+  .wan-faq{border-bottom:1px solid var(--border-color);padding:.55rem 0}
+  .wan-faq summary{cursor:pointer;font-weight:600;color:var(--dark-color);list-style:none}
+  .wan-faq summary::-webkit-details-marker{display:none}
+  .wan-faq summary::before{content:'+';color:var(--primary-color);font-weight:700;margin-right:.5rem}
+  .wan-faq[open] summary::before{content:'–'}
+  .wan-faq p{margin:.5rem 0 .3rem;font-size:.93rem}
+  .wan-who{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.9rem;margin:.8rem 0}
+  .wan-who div{background:var(--light-color);border:1px solid var(--border-color);
+    border-radius:12px;padding:.9rem 1rem;font-size:.92rem;color:var(--text-light)}
+  .wan-who strong{display:block;color:var(--dark-color);margin-bottom:.2rem;font-size:.97rem}
+  .mono{font-family:var(--font-mono)}
+  @media (max-width:720px){ .wan-two{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div id="shared-header"></div>
 
-  <nav class="crumb" aria-label="Đường dẫn">
-    <a href="/">Trang chủ</a> <span>/</span>
-    <a href="/tools/">Công cụ</a> <span>/</span>
+<main class="section" style="padding-top:130px;">
+<div class="container">
+<div class="wan-wrap">
+
+  <nav class="wan-crumb" aria-label="Đường dẫn">
+    <a href="/">Trang chủ</a><span>/</span><a href="/tools/">Công cụ</a><span>/</span>
     <span>Chọn nhà mạng cho MikroTik</span>
   </nav>
 
-  <h1>Tự dựng nút chọn nhà mạng cho MikroTik</h1>
-  <p class="lead">Router có từ hai đường WAN trở lên thì bình thường nó tự chia tải, máy con không xen vô được.
-  Trang này sinh ra cấu hình để <strong>mỗi máy tự chọn đi đường nào</strong>, chỉ bằng cách đổi default gateway.
-  Cấu hình cũ của router giữ nguyên, máy nào không đụng tới thì chạy y như cũ.</p>
+  <div class="section-title" style="text-align:left;margin-bottom:.5rem">
+    <span class="eyebrow">Công cụ chạy ngay trên trình duyệt</span>
+    <h1 style="font-family:var(--font-display);margin:.2rem 0">Router có 2 line mạng, cho từng máy tự chọn đi đường nào</h1>
+  </div>
 
-  <div class="note">
+  <p style="font-size:1.04rem;color:var(--text-light)">
+    Quán net có Viettel với FPT. Văn phòng có VNPT chạy chính, một line dự phòng.
+    Bình thường MikroTik tự chia tải, máy nào đi đường nào là chuyện hên xui, mà có
+    những việc bắt buộc phải đi đúng một nhà mạng.
+    Công cụ này dựng ra <strong>một cái nút trên từng máy</strong>: bấm là máy đó đi đúng
+    đường bạn chọn. Máy nào không đụng tới thì chạy y như cũ.
+  </p>
+
+  <!-- ==================== AI CẦN + ĐIỀU KIỆN ==================== -->
+  <div class="wan-card">
+    <h2>Ai cần cái này</h2>
+    <div class="wan-who">
+      <div><strong>Phòng net, quán game</strong>
+        Hai line cho đỡ nghẽn. Muốn ghim mấy máy live stream hay mấy game quốc tế vào
+        đúng line ping thấp, còn lại để chia đều.</div>
+      <div><strong>Văn phòng hai đường truyền</strong>
+        Phần mềm kế toán, hoá đơn điện tử, ngân hàng hay khoá theo dải IP. Đổi line là
+        đăng nhập không được, phải chọn đúng.</div>
+      <div><strong>Người bán hàng online</strong>
+        Mỗi tài khoản một line cố định cho khỏi bị nghi đăng nhập lạ, khỏi phải xài
+        thêm phần mềm đổi IP.</div>
+      <div><strong>Nhà có hai mạng</strong>
+        Một đường xem phim tải nặng, một đường để họp online cho khỏi giật. Tự tay
+        chọn thay vì để router bốc thăm.</div>
+    </div>
+
+    <h3>Cần có gì trước khi bắt đầu</h3>
+    <ul style="color:var(--text-light);font-size:.95rem;line-height:1.9;padding-left:1.2rem;margin:.3rem 0">
+      <li>Một <strong>router MikroTik</strong> chạy RouterOS. Bản v6 hay v7 đều được, trang tự nhận và sinh lệnh đúng kiểu.</li>
+      <li><strong>Từ hai đường Internet trở lên</strong> đang cắm vào router đó.</li>
+      <li>Vào được <strong>Winbox</strong> hoặc SSH của router bằng tài khoản có quyền sửa cấu hình.</li>
+      <li>Máy nào muốn chọn được thì phải <strong>nằm trực tiếp trên lớp mạng của MikroTik</strong>, và có quyền quản trị trên máy đó.</li>
+    </ul>
+
+    <div class="wan-note">
+      <strong>PPPoE hay DHCP đều chạy.</strong>
+      Trang dò đường WAN theo <em>bảng định tuyến</em> của router chứ không dò theo PPPoE, nên bốn kiểu
+      đấu nối đều nhận ra: quay PPPoE thẳng trên router, WAN lấy IP bằng DHCP, WAN đặt IP tĩnh,
+      và kiểu hay gặp nhất ở quán net là <em>cắm vào modem nhà mạng đang NAT sẵn</em> (lúc đó WAN
+      mang IP nội bộ kiểu <code>192.168.1.2</code>). Với WAN ethernet thì lệnh trỏ thẳng vào IP
+      next-hop, còn PPPoE thì trỏ tên interface.
+    </div>
+  </div>
+
+  <!-- ==================== XEM TRƯỚC APP ==================== -->
+  <div class="wan-card">
+    <h2>Máy người dùng sẽ thấy cái này</h2>
+    <div class="wan-two">
+      <div>
+        <img class="wan-shot" src="https://trinhleminhan.com/api/upload/up-a377c1623b084dc4.png"
+             alt="Giao diện app chọn nhà mạng: bốn nút Viettel, VNPT, gộp cả hai, và Mặc định"
+             width="676" height="877" loading="lazy">
+      </div>
+      <div>
+        <p>Bấm đúp là mở, không cài đặt. Mỗi nút là một lựa chọn bạn đặt ở bước 3, kèm tên và
+        màu bạn tự chọn.</p>
+        <ul style="color:var(--text-light);font-size:.94rem;line-height:1.85;padding-left:1.2rem">
+          <li>Bản <strong>Windows</strong> là cửa sổ bấm nút, tự xin quyền quản trị.</li>
+          <li>Bản <strong>macOS / Linux</strong> là menu gõ số trong Terminal.</li>
+          <li>Có nút <strong>kiểm tra IP public</strong> để thấy ngay mình đang ra bằng nhà mạng nào.</li>
+          <li>Đổi xong nó <strong>tự kiểm lại bảng định tuyến</strong>. Nếu có VPN hay card mạng khác
+            giành mất đường ra, nó gọi đích danh card đó chứ không báo thành công giả.</li>
+          <li>Lựa chọn <strong>nhớ qua cả lần khởi động lại máy</strong>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="wan-note">
     <strong>Trang này chạy hoàn toàn trong trình duyệt của bạn.</strong>
-    Không có máy chủ nào, không gửi dữ liệu router đi đâu, không lưu gì lại.
-    Tắt mạng rồi mở file này lên vẫn chạy được. Bạn có thể bấm Ctrl+U xem toàn bộ mã.
+    Cấu hình router bạn dán vào chỉ nằm trong máy bạn: việc đọc cấu hình, sinh lệnh và
+    đóng gói app đều làm bằng JavaScript ngay tại chỗ. Không có máy chủ nào nhận dữ liệu
+    router, không lưu lại gì. Bấm Ctrl+U xem được toàn bộ mã.
   </div>
 
   <!-- ============================ BƯỚC 1 ============================ -->
-  <div class="card">
-    <div class="step"><div class="num">1</div><div><h2>Lấy hiện trạng router</h2>
+  <div class="wan-card">
+    <div class="wan-step"><div class="wan-num">1</div><div><h2>Lấy hiện trạng router</h2>
       <p style="margin:0">Mở <strong>Winbox &gt; New Terminal</strong> (hoặc SSH vô router), dán nguyên khối lệnh này rồi Enter.
       Toàn bộ là lệnh <strong>chỉ đọc</strong>, không sửa gì hết.</p></div></div>
     <pre id="surveyCmd"></pre>
-    <div class="row">
-      <button class="sm" onclick="copyEl('surveyCmd', this)">Chép lệnh</button>
-      <span class="pill">chỉ đọc, không thay đổi gì trên router</span>
+    <div class="wan-row">
+      <button class="wan-btn sm" onclick="copyEl('surveyCmd', this)">Chép lệnh</button>
+      <span class="wan-pill">chỉ đọc, không thay đổi gì trên router</span>
     </div>
   </div>
 
   <!-- ============================ BƯỚC 2 ============================ -->
-  <div class="card">
-    <div class="step"><div class="num">2</div><div><h2>Dán kết quả vào đây</h2>
+  <div class="wan-card">
+    <div class="wan-step"><div class="wan-num">2</div><div><h2>Dán kết quả vào đây</h2>
       <p style="margin:0">Bôi đen toàn bộ kết quả trong terminal, Ctrl+C, rồi dán xuống ô dưới.
       Nhớ lấy cả mấy dòng bắt đầu bằng dấu <code>#</code>.</p></div></div>
     <textarea id="rawInput" spellcheck="false" placeholder="#VER&#10;7.23.2 (stable)&#10;hEX&#10;..."></textarea>
-    <div class="row" style="margin-top:.6rem">
-      <button onclick="doRead()">Đọc hiện trạng</button>
-      <button class="ghost sm" onclick="loadDemo()">Dùng dữ liệu mẫu để thử</button>
+    <div class="wan-row" style="margin-top:.7rem">
+      <button class="wan-btn" onclick="doRead()">Đọc hiện trạng</button>
+      <button class="wan-btn ghost sm" onclick="loadDemo()">Chưa có router? Xem thử bằng dữ liệu mẫu</button>
     </div>
     <div id="surveyOut"></div>
   </div>
 
   <!-- ============================ BƯỚC 3 ============================ -->
-  <div class="card hidden" id="cardCfg">
-    <div class="step"><div class="num">3</div><div><h2>Đặt nút</h2>
+  <div class="wan-card hidden" id="cardCfg">
+    <div class="wan-step"><div class="wan-num">3</div><div><h2>Đặt nút</h2>
       <p style="margin:0">Sửa tên cho dễ hiểu với người dùng cuối. Tên này hiện thẳng trên nút bấm.</p></div></div>
 
-    <h3 style="font-size:.95rem;margin:1rem 0 .2rem">Đường WAN</h3>
+    <h3>Đường WAN</h3>
     <table id="wanTable"></table>
+    <div class="wan-row" id="addWanRow"></div>
 
-    <h3 style="font-size:.95rem;margin:1.4rem 0 .2rem">Các nút sẽ hiện trên máy người dùng</h3>
+    <h3>Các nút sẽ hiện trên máy người dùng</h3>
     <table id="profTable"></table>
-    <div class="row"><button class="ghost sm" onclick="addProfile()">+ Thêm nút</button></div>
+    <div class="wan-row"><button class="wan-btn ghost sm" onclick="addProfile()">+ Thêm nút</button></div>
 
-    <h3 style="font-size:.95rem;margin:1.4rem 0 .5rem">Thiết lập chung</h3>
-    <div class="grid">
-      <div><label class="f">Tên hiện trên app</label><input type="text" id="sysName" value="Chọn nhà mạng ra Internet"></div>
-      <div><label class="f">Interface LAN</label><input type="text" id="lanIf"></div>
-      <div><label class="f">Lớp mạng LAN</label><input type="text" id="lanNet"></div>
-      <div><label class="f">Gateway hiện tại của LAN</label><input type="text" id="lanGw"></div>
-      <div><label class="f">Nhãn cấu hình (dùng để gỡ)</label><input type="text" id="tag" value="WANSEL"></div>
-      <div><label class="f">Tiền tố đặt tên</label><input type="text" id="prefix" value="sel"></div>
-      <div><label class="f">VRID bắt đầu từ</label><input type="number" id="vridBase" value="200" min="1" max="250"></div>
+    <h3>Thiết lập chung</h3>
+    <div class="wan-grid">
+      <div><label class="wan-lab">Tên hiện trên app</label><input type="text" id="sysName" value="Chọn nhà mạng ra Internet"></div>
+      <div><label class="wan-lab">Interface LAN</label><input type="text" id="lanIf"></div>
+      <div><label class="wan-lab">Lớp mạng LAN</label><input type="text" id="lanNet"></div>
+      <div><label class="wan-lab">Gateway hiện tại của LAN</label><input type="text" id="lanGw"></div>
+      <div><label class="wan-lab">Nhãn cấu hình (dùng để gỡ)</label><input type="text" id="tag" value="WANSEL"></div>
+      <div><label class="wan-lab">Tiền tố đặt tên</label><input type="text" id="prefix" value="sel"></div>
+      <div><label class="wan-lab">VRID bắt đầu từ</label><input type="number" id="vridBase" value="200" min="1" max="250"></div>
     </div>
-    <div class="row" style="margin-top:.8rem">
-      <label class="chk"><input type="checkbox" id="checkGw" checked> Bật <code>check-gateway=ping</code></label>
-      <label class="chk"><input type="checkbox" id="failover"> Tự nhảy sang WAN còn lại khi WAN đã chọn đứt</label>
+    <div class="wan-row" style="margin-top:.9rem">
+      <label class="wan-chk"><input type="checkbox" id="checkGw" checked> Bật <code>check-gateway=ping</code></label>
+      <label class="wan-chk"><input type="checkbox" id="failover"> Tự nhảy sang WAN còn lại khi WAN đã chọn đứt</label>
     </div>
-    <div class="warnbox" style="margin-top:1rem">
+    <div class="wan-warn">
       Bật tự nhảy WAN thì máy <em>không mất mạng</em> khi đường đã chọn đứt, nhưng nó sẽ <em>lặng lẽ đi sang nhà mạng khác</em>.
       Ai chọn cố định vì cần đúng lớp IP public thì nên để tắt.
     </div>
-    <div class="row" style="margin-top:.8rem"><button onclick="doBuild()">Sinh cấu hình</button></div>
+    <div class="wan-row" style="margin-top:.9rem"><button class="wan-btn" onclick="doBuild()">Sinh cấu hình</button></div>
   </div>
 
   <!-- ============================ BƯỚC 4 ============================ -->
-  <div class="card hidden" id="cardOut">
-    <div class="step"><div class="num">4</div><div><h2>Kết quả</h2>
+  <div class="wan-card hidden" id="cardOut">
+    <div class="wan-step"><div class="wan-num">4</div><div><h2>Kết quả</h2>
       <p style="margin:0">Dán đoạn lệnh vô router, rồi phát app cho máy người dùng.</p></div></div>
     <div id="planMsg"></div>
-    <div class="tabs" role="tablist">
+    <div class="wan-tabs" role="tablist">
       <button role="tab" data-tab="install" aria-selected="true" onclick="showTab('install')">Lệnh cài đặt</button>
       <button role="tab" data-tab="rollback" aria-selected="false" onclick="showTab('rollback')">Lệnh gỡ bỏ</button>
       <button role="tab" data-tab="apps" aria-selected="false" onclick="showTab('apps')">App cho máy người dùng</button>
     </div>
 
     <div id="tab-install">
-      <div class="warnbox"><strong>Trước khi dán: sao lưu router.</strong>
+      <div class="wan-warn"><strong>Trước khi dán: sao lưu router.</strong>
         Vô <em>Files</em> bấm <em>Backup</em>, hoặc chạy
         <code>/system backup save name=truoc-khi-doi</code> và
         <code>/export file=truoc-khi-doi</code>, rồi kéo hai file đó về máy.</div>
       <pre id="rscOut"></pre>
-      <div class="row">
-        <button class="sm" onclick="copyEl('rscOut', this)">Chép</button>
-        <button class="sm ghost" onclick="downloadText('rscOut','cai-dat.rsc')">Tải .rsc</button>
+      <div class="wan-row">
+        <button class="wan-btn sm" onclick="copyEl('rscOut', this)">Chép</button>
+        <button class="wan-btn ghost sm" onclick="downloadText('rscOut','cai-dat.rsc')">Tải .rsc</button>
       </div>
     </div>
 
     <div id="tab-rollback" class="hidden">
       <p>Đổi ý, hoặc có gì trục trặc thì dán khối này vô là router trở lại như trước.</p>
       <pre id="rbOut"></pre>
-      <div class="row">
-        <button class="sm" onclick="copyEl('rbOut', this)">Chép</button>
-        <button class="sm ghost" onclick="downloadText('rbOut','go-bo.rsc')">Tải .rsc</button>
+      <div class="wan-row">
+        <button class="wan-btn sm" onclick="copyEl('rbOut', this)">Chép</button>
+        <button class="wan-btn ghost sm" onclick="downloadText('rbOut','go-bo.rsc')">Tải .rsc</button>
       </div>
     </div>
 
     <div id="tab-apps" class="hidden">
       <p>Hai gói này đã nhúng sẵn đúng cấu hình vừa sinh. Chép nguyên cả thư mục sang máy người dùng, bấm đúp là chạy.</p>
-      <div class="row">
-        <button onclick="dl('Windows')">Tải bản Windows</button>
-        <button onclick="dl('macOS')">Tải bản macOS / Linux</button>
+      <div class="wan-row">
+        <button class="wan-btn" onclick="dl('Windows')">Tải bản Windows</button>
+        <button class="wan-btn" onclick="dl('macOS')">Tải bản macOS / Linux</button>
       </div>
-      <div class="note">Máy người dùng cần quyền quản trị để đổi route, và phải nằm <strong>trực tiếp</strong> trên lớp mạng LAN.
+      <div class="wan-note">Máy người dùng cần quyền quản trị để đổi route, và phải nằm <strong>trực tiếp</strong> trên lớp mạng LAN.
       Máy nằm sau một router NAT khác thì không chọn được, vì MikroTik chỉ thấy đúng một địa chỉ nguồn.</div>
       <div id="profPreview"></div>
     </div>
   </div>
 
-  <div class="card">
+  <!-- ============================ FAQ ============================ -->
+  <div class="wan-card">
+    <h2>Hỏi nhanh đáp gọn</h2>
+
+    <details class="wan-faq"><summary>Router chỉ chạy PPPoE mới dùng được hay DHCP cũng được?</summary>
+      <p>Kiểu nào cũng được. Trang dò đường WAN theo bảng default route của router, nên PPPoE,
+      DHCP client, IP tĩnh, hay WAN cắm sau modem nhà mạng đang NAT đều nhận ra. Nếu vẫn sót thì
+      ở bước 3 có ô thêm tay.</p></details>
+
+    <details class="wan-faq"><summary>Có phải cài gì lên máy con không?</summary>
+      <p>Không. Máy con chỉ đổi default gateway, không cài driver, không VPN, không phần mềm nền.
+      App bấm nút là một thư mục nhỏ, chép sang bấm đúp là chạy.</p></details>
+
+    <details class="wan-faq"><summary>Máy nào không mở app thì sao?</summary>
+      <p>Chạy y như cũ. Cấu hình chỉ thêm gateway mới chứ không đụng vào hành vi mặc định của
+      router, nên máy không đổi gateway vẫn đi theo đường router đang chia.</p></details>
+
+    <details class="wan-faq"><summary>Máy nằm sau bộ phát Wi-Fi riêng có chọn được không?</summary>
+      <p>Không. Bộ phát Wi-Fi có NAT gộp cả cụm thành một địa chỉ nguồn, MikroTik chỉ thấy đúng
+      một máy. Cách xử lý: chuyển bộ phát đó sang chế độ Bridge hoặc Access Point, hoặc ghim cả
+      cụm vào một nhà mạng cố định.</p></details>
+
+    <details class="wan-faq"><summary>Cấu hình router hiện tại có bị mất không?</summary>
+      <p>Không. Lệnh sinh ra chỉ thêm đối tượng mới mang một nhãn riêng, và luôn kèm đoạn lệnh gỡ
+      bỏ để trả router về đúng như trước. Vẫn nên sao lưu router trước khi dán, trang có nhắc.</p></details>
+
+    <details class="wan-faq"><summary>Bao nhiêu đường WAN thì chạy được?</summary>
+      <p>Từ hai trở lên. Ba, bốn line cũng được, mỗi line một nút, và tạo thêm được nút gộp nhiều
+      line để chia tải giữa chúng.</p></details>
+
+    <details class="wan-faq"><summary>Dữ liệu router của tôi có bị gửi đi đâu không?</summary>
+      <p>Không. Toàn bộ chạy bằng JavaScript trong trình duyệt của bạn. Không có máy chủ nào nhận
+      dữ liệu router, không lưu lại gì. Bấm Ctrl+U là xem được hết mã.</p></details>
+  </div>
+
+  <div class="wan-card">
     <h2>Muốn làm bài bản hơn</h2>
     <p>Trang này làm bằng cách dán qua dán lại, nên thiếu ba thứ mà bản chạy trên máy có:
     sao lưu tự động trước khi ghi, kiểm chứng lại bằng SSH sau khi ghi, và
     <em>dead-man switch</em> tự hoàn tác nếu bạn mất kết nối giữa chừng.
     Cấu hình từ xa mà tự khoá mình ở ngoài là chuyện có thật.</p>
-    <p>App quản trị đầy đủ, mã nguồn mở, giấy phép MIT:
-    <a href="https://github.com/trinhleminhan-vn/mikrotik-wan-selector" target="_blank" rel="noopener">github.com/trinhleminhan-vn/mikrotik-wan-selector</a></p>
+    <p style="margin-bottom:0">App quản trị đầy đủ, mã nguồn mở, giấy phép MIT:
+    <a href="https://github.com/trinhleminhan-vn/mikrotik-wan-selector" target="_blank" rel="noopener">github.com/trinhleminhan-vn/mikrotik-wan-selector</a>
+    &nbsp;·&nbsp;
+    <a href="/blog/cho-moi-may-tu-chon-nha-mang-tren-mikrotik-hai-duong-wan">Đọc bài kể chuyện dựng cái này</a></p>
   </div>
 
-  <div class="foot">
-    Thêm phần mềm khác: <a href="https://trinhleminhan.com/tools">trinhleminhan.com/tools</a>
-    &nbsp;·&nbsp;
-    Đặt làm công cụ riêng: <a href="https://trinhleminhan.com/lien-he/">trinhleminhan.com/lien-he</a>
-  </div>
 </div>
+</div>
+</main>
+
+<div id="shared-footer"></div>
+
+<script src="/js/components.js?v=20260504c"></script>
+<script src="/js/main.js?v=20260504e"></script>
 
 <script>
 /*__CLIENT_FILES__*/
@@ -287,10 +445,12 @@ const SURVEY_CMD = [
   ':put "#DHCP"', '/ip dhcp-server print terse',
   ':put "#MANGLE"', '/ip firewall mangle print terse',
   ':put "#PPPOE"', ':do {/interface pppoe-client print terse} on-error={}',
+  ':put "#ROUTE"', '/ip route print terse where dst-address=0.0.0.0/0',
   ':put "#END"'
 ].join('; ');
 
-const PALETTE = ['#EE0033','#0068B3','#2E7D32','#EF6C00','#6A1B9A','#00838F','#546E7A'];
+// Lấy theo bảng màu của site cho khớp phần còn lại
+const PALETTE = ['#c4533d','#6f8f5c','#b8417a','#3d7ea6','#c98a2b','#7a5aa8','#8a7d6e'];
 
 let FACTS = null, CFG = null, PLAN = null;
 
@@ -324,28 +484,29 @@ function doRead(){
   let html = '';
 
   if (f.problems.length){
-    html += '<div class="' + (f.wans.length ? 'warnbox' : 'errbox') + '"><strong>Cần xem lại:</strong><ul style="margin:.4rem 0 0;padding-left:1.1rem">' +
+    html += '<div class="' + (f.wans.length ? 'wan-warn' : 'wan-err') + '"><strong>Cần xem lại:</strong><ul style="margin:.4rem 0 0;padding-left:1.1rem">' +
       f.problems.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul></div>';
   }
   if (f.interfaces.length){
     html += '<table><tr><th>Mục</th><th>Đọc được</th></tr>' +
       row('Router', (f.board || '?') + '   RouterOS ' + (f.version || '?') +
           (f.freeMiB !== null ? '   ·   trống ' + f.freeMiB + ' MiB' : '')) +
-      row('LAN', f.lanInterface ? (f.lanInterface + '   ' + f.lanSubnet + '   gateway ' + f.lanGateway) : '<em>không dò ra</em>') +
+      row('LAN', f.lanInterface ? (esc(f.lanInterface) + '   ' + esc(f.lanSubnet) + '   gateway ' + esc(f.lanGateway)) : '<em>không dò ra</em>') +
       row('Đường WAN', f.wans.length
-          ? f.wans.map(w => esc(w.interface) + (w.running ? ' <span class="ok">đang chạy</span>' : ' <span class="pill">tắt</span>') +
-              (w.ip ? ' <span class="pill">' + esc(w.ip) + '</span>' : '') +
-              (w.comment ? ' <span class="pill">' + esc(w.comment) + '</span>' : '')).join('<br>')
+          ? f.wans.map(w => esc(w.interface) + (w.running ? ' <span class="wan-ok">đang chạy</span>' : ' <span class="wan-pill">tắt</span>') +
+              ' <span class="wan-pill">' + esc(w.kind) + '</span>' +
+              (w.ip ? ' <span class="wan-pill">' + esc(w.ip) + '</span>' : '') +
+              (w.comment ? ' <span class="wan-pill">' + esc(w.comment) + '</span>' : '')).join('<br>')
           : '<em>không thấy</em>') +
       row('VRID đã dùng', f.usedVrids.length ? f.usedVrids.join(', ') : 'chưa có cái nào') +
-      row('Bảng định tuyến', f.routingTables.length ? f.routingTables.join(', ') : '(chỉ có main)') +
+      row('Bảng định tuyến', f.routingTables.length ? esc(f.routingTables.join(', ')) : '(chỉ có main)') +
       row('Rule mangle', f.mangle.length + ' rule, sẽ chèn vào vị trí ' + mangleIndex(f, $('tag').value || 'WANSEL')) +
       '</table>';
   }
   $('surveyOut').innerHTML = html;
-  if (f.wans.length >= 2 && f.lanInterface) initConfig(f);
+  if (f.wans.length >= 1 && f.lanInterface) initConfig(f);
 }
-function row(k, v){ return '<tr><td style="width:11rem;color:var(--faint)">' + esc(k) + '</td><td>' + v + '</td></tr>'; }
+function row(k, v){ return '<tr><td style="width:11rem;color:var(--text-muted)">' + esc(k) + '</td><td>' + v + '</td></tr>'; }
 
 /* --------------------------- Bước 3 --------------------------- */
 function initConfig(f){
@@ -358,11 +519,11 @@ function initConfig(f){
       interface: w.interface,
       name: guessName(w) || ('WAN ' + (i + 1)),
       color: PALETTE[i % PALETTE.length],
+      nextHop: w.nextHop || '',
     })),
     profiles: [],
   };
-  // Mỗi WAN một nút, cộng thêm một nút gộp tất cả, cộng nút mặc định.
-  CFG.wans.forEach((w, i) => CFG.profiles.push({
+  CFG.wans.forEach(w => CFG.profiles.push({
     name: w.name, wans: [w.interface], color: w.color,
     detail: 'Đi riêng qua đường ' + w.name, isDefault: false }));
   if (CFG.wans.length >= 2) CFG.profiles.push({
@@ -370,7 +531,7 @@ function initConfig(f){
     wans: CFG.wans.map(w => w.interface),
     color: blend(CFG.wans.map(w => w.color)),
     detail: 'Chia tải giữa ' + CFG.wans.map(w => w.name).join(' + '), isDefault: false });
-  CFG.profiles.push({ name: 'Mặc định', wans: [], color: '#546E7A',
+  CFG.profiles.push({ name: 'Mặc định', wans: [], color: '#8a7d6e',
     detail: 'Giữ nguyên hành vi mặc định của router', isDefault: true });
 
   renderWans(); renderProfiles();
@@ -380,12 +541,10 @@ function initConfig(f){
 
 const ISPS = ['viettel','vnpt','fpt','cmc','mobifone','vinaphone','netnam','sctv','vtvcab','gmobile'];
 function guessName(w){
-  const sources = [w.comment, w.parentComment, w.user];
-  for (const src of sources){
+  for (const src of [w.comment, w.parentComment, w.user]){
     const t = String(src || '').toLowerCase();
     for (const n of ISPS) if (t.includes(n)) return n.toUpperCase();
   }
-  // không khớp nhà mạng nào thì lấy chữ đầu của comment, còn hơn "WAN 1"
   const c = (w.comment || w.parentComment || '').trim();
   return c ? c.split(/\s+/)[0] : '';
 }
@@ -400,36 +559,62 @@ function blend(colors){
 }
 
 function renderWans(){
-  let h = '<tr><th>Interface</th><th>Tên hiển thị</th><th style="width:4rem">Màu</th></tr>';
+  let h = '<tr><th>Interface</th><th>Tên hiển thị</th><th style="width:4rem">Màu</th><th style="width:3rem"></th></tr>';
   CFG.wans.forEach((w, i) => {
-    const src = FACTS.wans.find(x => x.interface === w.interface) || {};
-    const hint = src.parent ? '<br><span class="pill">qua ' + esc(src.parent) +
-        (src.parentComment ? ': ' + esc(src.parentComment) : '') + '</span>' : '';
+    const src = (FACTS.wans || []).find(x => x.interface === w.interface) || {};
+    const bits = [];
+    if (src.kind) bits.push(esc(src.kind));
+    if (src.parent) bits.push('qua ' + esc(src.parent) + (src.parentComment ? ': ' + esc(src.parentComment) : ''));
+    if (w.nextHop) bits.push('next-hop ' + esc(w.nextHop));
+    const hint = bits.length ? '<br><span class="wan-pill">' + bits.join(' · ') + '</span>' : '';
     h += '<tr><td class="mono">' + esc(w.interface) + hint + '</td>' +
       '<td><input type="text" value="' + esc(w.name) + '" oninput="setWan(' + i + ',this.value)"></td>' +
-      '<td><input type="color" value="' + esc(w.color) + '" oninput="setWanColor(' + i + ',this.value)"></td></tr>';
+      '<td><input type="color" value="' + esc(w.color) + '" oninput="setWanColor(' + i + ',this.value)"></td>' +
+      '<td><button class="wan-btn ghost sm" onclick="delWan(' + i + ')">Bỏ</button></td></tr>';
   });
   $('wanTable').innerHTML = h;
+
+  // Dò sót thì thêm tay. Router lạ kiểu thì chuyện này vẫn xảy ra.
+  const have = new Set(CFG.wans.map(w => w.interface));
+  const rest = (FACTS.allInterfaces || []).filter(n => !have.has(n) && n !== $('lanIf').value);
+  $('addWanRow').innerHTML = rest.length
+    ? '<span style="font-size:.86rem;color:var(--text-muted)">Thiếu đường nào?</span>' +
+      '<select id="addWanSel" style="max-width:16rem">' +
+      rest.map(n => '<option>' + esc(n) + '</option>').join('') + '</select>' +
+      '<button class="wan-btn ghost sm" onclick="addWan()">+ Thêm đường WAN</button>'
+    : '';
 }
 function setWan(i, v){ CFG.wans[i].name = v; }
 function setWanColor(i, v){ CFG.wans[i].color = v; }
+function addWan(){
+  const n = $('addWanSel').value;
+  if (!n) return;
+  CFG.wans.push({ interface: n, name: n, color: PALETTE[CFG.wans.length % PALETTE.length], nextHop: '' });
+  renderWans(); renderProfiles();
+}
+function delWan(i){
+  const gone = CFG.wans[i].interface;
+  CFG.wans.splice(i, 1);
+  CFG.profiles.forEach(p => { p.wans = p.wans.filter(x => x !== gone); });
+  renderWans(); renderProfiles();
+}
 
 function renderProfiles(){
   let h = '<tr><th>Tên nút</th><th>Đi ra đường</th><th style="width:4rem">Màu</th><th style="width:3rem"></th></tr>';
   CFG.profiles.forEach((p, i) => {
     let picks = '';
     if (p.isDefault) {
-      picks = '<span class="pill">giữ nguyên gateway ' + esc($('lanGw').value) + '</span>';
+      picks = '<span class="wan-pill">giữ nguyên gateway ' + esc($('lanGw').value) + '</span>';
     } else {
       picks = CFG.wans.map(w =>
-        '<label class="chk" style="display:inline-flex;margin-right:.7rem">' +
+        '<label class="wan-chk" style="display:inline-flex;margin-right:.8rem">' +
         '<input type="checkbox" ' + (p.wans.includes(w.interface) ? 'checked' : '') +
         ' onchange="toggleWan(' + i + ',\'' + esc(w.interface) + '\',this.checked)"> ' + esc(w.name) + '</label>').join('');
     }
     h += '<tr><td><input type="text" value="' + esc(p.name) + '" oninput="setProf(' + i + ',this.value)"></td>' +
       '<td>' + picks + '</td>' +
       '<td><input type="color" value="' + esc(p.color) + '" oninput="setProfColor(' + i + ',this.value)"></td>' +
-      '<td>' + (p.isDefault ? '' : '<button class="ghost sm" onclick="delProfile(' + i + ')">Xoá</button>') + '</td></tr>';
+      '<td>' + (p.isDefault ? '' : '<button class="wan-btn ghost sm" onclick="delProfile(' + i + ')">Xoá</button>') + '</td></tr>';
   });
   $('profTable').innerHTML = h;
 }
@@ -479,7 +664,7 @@ function doBuild(){
 
   let msg = '';
   if (plan.errors.length){
-    msg = '<div class="errbox"><strong>Chưa sinh được:</strong><ul style="margin:.4rem 0 0;padding-left:1.1rem">' +
+    msg = '<div class="wan-err"><strong>Chưa sinh được:</strong><ul style="margin:.4rem 0 0;padding-left:1.1rem">' +
       plan.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul></div>';
     $('planMsg').innerHTML = msg;
     $('cardOut').classList.remove('hidden');
@@ -487,16 +672,16 @@ function doBuild(){
     return;
   }
   if (plan.warnings.length){
-    msg += '<div class="warnbox"><strong>Lưu ý:</strong><ul style="margin:.4rem 0 0;padding-left:1.1rem">' +
+    msg += '<div class="wan-warn"><strong>Lưu ý:</strong><ul style="margin:.4rem 0 0;padding-left:1.1rem">' +
       plan.warnings.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul></div>';
   }
   if (plan.poolChanges.length){
-    msg += '<div class="warnbox">DHCP pool sẽ bị thu hẹp để chừa chỗ cho IP gateway: ' +
+    msg += '<div class="wan-warn">DHCP pool sẽ bị thu hẹp để chừa chỗ cho IP gateway: ' +
       plan.poolChanges.map(([n, o, w]) => '<code>' + esc(n) + '</code>: ' + esc(o) + ' &rarr; ' + esc(w)).join('; ') + '</div>';
   }
   const tbl = plan.allocations.map(a =>
     '<tr><td>' + esc(a.profile.name) + '</td><td class="mono">' + esc(a.gateway) + '</td><td>' +
-    (a.vrid ? 'vrid ' + a.vrid + ' · ' + esc(a.vrrpName) : '<span class="pill">có sẵn</span>') + '</td></tr>').join('');
+    (a.vrid ? 'vrid ' + a.vrid + ' · ' + esc(a.vrrpName) : '<span class="wan-pill">có sẵn</span>') + '</td></tr>').join('');
   msg += '<table><tr><th>Nút</th><th>Gateway máy con phải đặt</th><th>Tạo trên router</th></tr>' + tbl + '</table>';
 
   $('planMsg').innerHTML = msg;
@@ -512,7 +697,7 @@ function showTab(name){
   for (const t of ['install','rollback','apps']){
     $('tab-' + t).classList.toggle('hidden', t !== name);
   }
-  document.querySelectorAll('.tabs button').forEach(b =>
+  document.querySelectorAll('.wan-tabs button').forEach(b =>
     b.setAttribute('aria-selected', String(b.dataset.tab === name)));
 }
 
@@ -526,8 +711,7 @@ function dl(platform){
 }
 
 /* --------------------------- dữ liệu mẫu --------------------------- */
-// Mo trang voi #thu-ngay se tu chay het luong bang du lieu mau.
-// Dung de kiem tra nhanh, va de nguoi doc thay ket qua ma khong can co router.
+// Mở trang kèm #thu-ngay thì tự chạy hết luồng, khỏi cần router.
 window.addEventListener('DOMContentLoaded', () => {
   if (location.hash === '#thu-ngay') { loadDemo(); doBuild(); }
 });
@@ -558,6 +742,9 @@ function loadDemo(){
     '#PPPOE',
     ' 0   name=pppoe-out1 interface=ether1 user=viettel',
     ' 1   name=pppoe-out2 interface=ether2 user=vnpt',
+    '#ROUTE',
+    ' 0 A S dst-address=0.0.0.0/0 gateway=pppoe-out1 distance=1',
+    ' 1 A S dst-address=0.0.0.0/0 gateway=pppoe-out2 distance=1',
     '#END'
   ].join('\n');
   doRead();

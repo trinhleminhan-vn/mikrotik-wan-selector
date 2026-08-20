@@ -104,9 +104,17 @@ function headers() {
     'cache-control': 'public, max-age=300',
     // Trang không gọi mạng, không nhúng gì từ ngoài. Khoá chặt luôn cho chắc,
     // để người dùng tin được câu "dữ liệu router không đi đâu hết".
+    // Trang dùng CSS + header/footer của chính site, nên phải cho 'self'.
+    // Điểm mấu chốt vẫn giữ: connect-src chỉ 'self', không có đích nào khác,
+    // nên cấu hình router bạn dán vào không có đường nào rời khỏi máy bạn.
     'content-security-policy':
-      "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; " +
-      "img-src data:; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
+      "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' https://unpkg.com https://www.googletagmanager.com; " +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src 'self' data: https://fonts.gstatic.com; " +
+      "img-src 'self' data: https:; " +
+      "connect-src 'self' https://www.google-analytics.com; " +
+      "form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
   };

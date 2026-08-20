@@ -68,7 +68,7 @@ function readSurvey(text) {
   const s = splitSections(text);
   const f = {
     ok: false, problems: [], identity: '', version: '', board: '', freeMiB: null,
-    interfaces: [], wans: [], lanInterface: '', lanSubnet: '', lanGateway: '',
+    interfaces: [], wans: [], wanHints: {}, lanInterface: '', lanSubnet: '', lanGateway: '',
     usedIps: [], usedVrids: [], routingTables: [], pools: [], mangle: [],
   };
 
@@ -103,6 +103,7 @@ function readSurvey(text) {
   // Ba nguồn, gộp lại: pppoe-client khai báo, interface kiểu pppoe-out,
   // và bất kỳ interface nào đang mang địa chỉ IP public.
   const wanNames = new Set();
+  const nextHop = {};        // interface -> IP next-hop, nếu bảng route có ghi
   const pppoe = {};
   for (const r of parseTerse(s.PPPOE || '')) {
     if (!r.name) continue;
@@ -114,6 +115,32 @@ function readSurvey(text) {
     const ip = (r.address || '').split('/')[0];
     if (ip && r.interface && !isPrivate(ip)) wanNames.add(r.interface);
   }
+  // Nguồn chắc ăn nhất: cái gì đang gánh default route thì đó là đường ra.
+  // Bắt được cả DHCP client, IP tĩnh, và WAN cắm sau modem nhà mạng đang NAT
+  // (mấy ca đó IP là nội bộ nên dò theo "IP public" sẽ trượt).
+  for (const r of parseTerse(s.ROUTE || '')) {
+    if ((r['.flags'] || '').includes('X')) continue;     // route đang tắt
+    const via = r['gateway'] || r['immediate-gw'] || '';
+    for (const part of via.split(',')) {
+      const t = part.trim();
+      if (!t) continue;
+      // gateway ghi kiểu "10.0.0.1%ether1" hoặc thẳng tên interface
+      const name = t.includes('%') ? t.split('%')[1] : t;
+      if (ipToInt(name)) {                                // là IP -> tra ngược ra interface
+        for (const a of addrRows) {
+          if (a.interface && a.address && inNet(name, cidrOf(a.address))) {
+            wanNames.add(a.interface);
+            nextHop[a.interface] = name;
+          }
+        }
+      } else if (ifByName[name]) {
+        wanNames.add(name);
+      }
+    }
+  }
+  // LAN không phải WAN, dù nó có lỡ đứng trong bảng route
+  const dhcpIfaces = new Set(parseTerse(s.DHCP || '').map(r => r.interface).filter(Boolean));
+  for (const n of Array.from(wanNames)) if (dhcpIfaces.has(n)) wanNames.delete(n);
   for (const name of wanNames) {
     const row = ifByName[name] || {};
     const a = (addrByIface[name] || [])[0];
@@ -129,9 +156,24 @@ function readSurvey(text) {
       parentComment: parentComment,
       user: pp.user || '',
       ip: a ? (a.address || '').split('/')[0] : '',
+      nextHop: nextHop[name] || '',
     });
   }
   f.wans.sort((a, b) => a.interface.localeCompare(b.interface));
+
+  // Kiểu đường ra, để hiện cho người dùng biết trang đang hiểu router thế nào
+  for (const w of f.wans) {
+    const row = ifByName[w.interface] || {};
+    const t = row.type || '';
+    w.kind = pppoe[w.interface] ? 'PPPoE'
+           : t.startsWith('pppoe') ? 'PPPoE'
+           : (w.ip && !isPrivate(w.ip)) ? 'IP public'
+           : w.ip ? 'sau modem nhà mạng'
+           : 'default route';
+  }
+  f.allInterfaces = ifRows
+    .filter(r => r.name && !['bridge', 'loopback', 'vrrp'].includes(r.type || ''))
+    .map(r => r.name);
 
   // ---- LAN: lấy theo interface của DHCP server, đó là chỗ máy con thật sự nằm ----
   const dhcp = parseTerse(s.DHCP || '');
@@ -405,9 +447,16 @@ function buildPlan(cfg, facts) {
   c.push(sec('Route mặc định của từng bảng'));
   const chk = cfg.checkGateway ? ' check-gateway=ping' : '';
   const rt = plan.dialect === 'v7' ? 'routing-table' : 'routing-mark';
+  // PPPoE thì trỏ thẳng tên interface là đúng. WAN ethernet (DHCP / IP tĩnh /
+  // cắm sau modem) thì phải trỏ IP next-hop, vì trỏ tên interface bắt RouterOS
+  // đoán next-hop bằng ARP, kém tin cậy hơn.
+  const gwOf = iface => {
+    const w = cfg.wans.find(x => x.interface === iface);
+    return (w && w.nextHop) ? w.nextHop : iface;
+  };
   for (const a of plan.allocations) {
     if (!a.table) continue;
-    c.push('/ip route add dst-address=0.0.0.0/0 gateway=' + a.profile.wans.join(',') +
+    c.push('/ip route add dst-address=0.0.0.0/0 gateway=' + a.profile.wans.map(gwOf).join(',') +
            ' ' + rt + '=' + a.table + ' distance=1' + chk + ' comment=' + q(mark + ' ' + a.profile.name));
   }
 
@@ -419,7 +468,7 @@ function buildPlan(cfg, facts) {
       if (!a.table) continue;
       const rest = cfg.wans.map(w => w.interface).filter(i => !a.profile.wans.includes(i));
       if (!rest.length) continue;
-      c.push('/ip route add dst-address=0.0.0.0/0 gateway=' + rest.join(',') + ' ' + rt + '=' + a.table +
+      c.push('/ip route add dst-address=0.0.0.0/0 gateway=' + rest.map(gwOf).join(',') + ' ' + rt + '=' + a.table +
              ' distance=10' + state + ' comment=' + q(mark + ' du phong cho ' + a.profile.name));
     }
   }
