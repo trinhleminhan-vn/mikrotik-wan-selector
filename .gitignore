@@ -3,7 +3,7 @@ keys/
 *.pem
 id_rsa*
 backup/
-dist/
+/dist/
 __pycache__/
 *.pyc
 cauhinh*.yaml

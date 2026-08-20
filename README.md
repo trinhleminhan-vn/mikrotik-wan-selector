@@ -64,6 +64,34 @@ SSH key thay vì mật khẩu.
 
 ---
 
+## Trang web sinh cấu hình (không cần cài gì)
+
+`web/dist/index.html` là một trang tĩnh **tự chứa**, chạy hoàn toàn trong trình
+duyệt: không máy chủ, không SSH, không gửi dữ liệu router đi đâu. Mở thẳng từ ổ
+đĩa cũng chạy.
+
+Luồng bốn bước:
+
+1. Trang đưa một lệnh **chỉ đọc** để dán vào Winbox > New Terminal.
+2. Dán kết quả ngược lại vào trang. Trang tự đọc ra WAN, LAN, VRID trống, DHCP pool.
+3. Đặt tên nút, chọn màu.
+4. Nhận lại đoạn `.rsc` để dán vào router, đoạn `.rsc` gỡ bỏ, và **file zip app
+   người dùng đã nhúng đúng cấu hình** (zip được dựng ngay trong browser).
+
+Đoạn lệnh sinh ra **giống hệt từng ký tự** với bản Python trong `core/plan.py`,
+có bài kiểm đối chiếu để giữ hai bên không trôi khỏi nhau.
+
+Đổi lại, so với app quản trị chạy trên máy, trang web thiếu ba thứ: sao lưu tự
+động trước khi ghi, kiểm chứng lại bằng SSH sau khi ghi, và dead-man switch.
+
+```bash
+python web/build.py      # gộp web/src/* -> web/dist/index.html
+```
+
+Mở `web/dist/index.html#thu-ngay` để nó tự chạy hết luồng bằng dữ liệu mẫu.
+
+---
+
 ## Cách dùng nhanh — app quản trị có giao diện
 
 ```bash
