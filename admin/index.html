@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản trị — Chọn nhà mạng ra Internet</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#1f2937; --ok:#0f8a3c; --warn:#b45309; --err:#b91c1c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 "Segoe UI",system-ui,-apple-system,sans-serif}
+  header{background:var(--accent);color:#fff;padding:20px 28px}
+  header h1{margin:0;font-size:21px;letter-spacing:.3px}
+  header p{margin:4px 0 0;opacity:.75;font-size:13px}
+  main{max-width:1000px;margin:0 auto;padding:24px 20px 60px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:20px 22px;margin-bottom:18px}
+  .card.off{opacity:.45;pointer-events:none}
+  .card h2{margin:0 0 4px;font-size:16px}
+  .card h2 .n{display:inline-block;width:24px;height:24px;line-height:24px;
+       text-align:center;background:var(--accent);color:#fff;border-radius:50%;
+       font-size:12px;margin-right:8px;vertical-align:2px}
+  .hint{color:var(--muted);font-size:13px;margin:0 0 16px 32px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  input[type=text],input[type=password],input[type=number]{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;
+    font:inherit;background:#fff}
+  input:focus{outline:2px solid #93c5fd;border-color:#93c5fd}
+  input[type=color]{width:44px;height:34px;padding:2px;border:1px solid var(--line);
+    border-radius:6px;background:#fff}
+  select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;
+    font:inherit;background:#fff}
+  .note{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+  .msg ul{margin:8px 0 0;padding-left:20px}
+  .msg li{margin:3px 0}
+  .msg details{margin-top:8px}
+  .msg summary{cursor:pointer;font-size:12.5px;opacity:.8}
+  .msg code{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+
+  button{font:inherit;padding:9px 18px;border-radius:6px;border:1px solid var(--accent);
+    background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+  button.danger{background:#fff;color:var(--err);border-color:#fca5a5}
+  button:disabled{opacity:.45;cursor:default}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:12px;color:var(--muted);font-weight:600}
+  td.mono,pre{font-family:Consolas,"SF Mono",Menlo,monospace}
+
+  pre{background:#111827;color:#e5e7eb;padding:14px 16px;border-radius:8px;
+      overflow:auto;max-height:340px;font-size:12.5px;line-height:1.5;margin:12px 0 0}
+  pre .c{color:#7f8ea3}
+
+  .msg{padding:10px 14px;border-radius:7px;margin-top:12px;font-size:14px}
+  .msg.err{background:#fef2f2;color:var(--err);border:1px solid #fecaca}
+  .msg.warn{background:#fffbeb;color:var(--warn);border:1px solid #fde68a}
+  .msg.ok{background:#f0fdf4;color:var(--ok);border:1px solid #bbf7d0}
+
+  ul.steps{list-style:none;padding:0;margin:12px 0 0}
+  ul.steps li{padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  ul.steps .i{display:inline-block;width:20px}
+  ul.steps .d{color:var(--muted);font-size:12.5px}
+
+  /* ---- khung xem trước giao diện máy con ---- */
+  .pvtabs{display:flex;gap:6px;margin:14px 0 0}
+  .pvtab{padding:7px 16px;font-size:13px;background:#fff;color:var(--ink);
+    border:1px solid var(--line);border-radius:6px}
+  .pvtab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .pvwrap{margin-top:14px;display:flex;justify-content:center;
+    background:repeating-linear-gradient(45deg,#eceef1,#eceef1 10px,#e7e9ed 10px,#e7e9ed 20px);
+    border-radius:10px;padding:22px}
+
+  /* cửa sổ Windows */
+  .win{width:470px;background:#F5F6F8;border:1px solid #9aa4b0;border-radius:4px;
+    box-shadow:0 6px 24px rgba(0,0,0,.18);overflow:hidden;font-family:"Segoe UI",sans-serif}
+  .win .bar{display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:11.5px;
+    background:linear-gradient(#fdfdfd,#eef1f4);border-bottom:1px solid #d4d9de;color:#333}
+  .win .bar .sq{margin-left:auto;display:flex;gap:3px}
+  .win .bar .sq i{width:22px;height:15px;border:1px solid #b9c0c7;background:#fbfcfd;
+    border-radius:2px;font-style:normal;font-size:9px;text-align:center;line-height:14px;color:#555}
+  .win .hd{background:#1F2937;color:#fff;font-weight:700;font-size:15px;
+    padding:15px 18px;letter-spacing:.4px}
+  .win .body{padding:14px}
+  .win .st{background:#fff;border:1px solid #d9dde2;padding:10px 12px;
+    font-family:Consolas,monospace;font-size:11.5px;line-height:1.65;color:#1F2937;white-space:pre}
+  .win .btn{margin-top:9px;padding:11px 8px;border-radius:2px;color:#fff;text-align:center;
+    font-weight:700;font-size:13.5px;line-height:1.35}
+  .win .btn small{display:block;font-weight:600;font-size:11.5px;opacity:.95}
+  .win .chk{margin-top:11px;padding:9px;background:#fff;border:1px solid #b9c0c7;
+    text-align:center;font-size:12.5px;border-radius:2px}
+  .win .lgl{margin-top:12px;font-size:11.5px;font-weight:700;color:#4B5563}
+  .win .ft{margin-top:11px;text-align:center;font-size:10.5px;color:#6B7280}
+  .win .ft a{color:#0068B3;text-decoration:none}
+  .win .lg{margin-top:5px;background:#fff;border:1px solid #d9dde2;padding:8px 10px;height:74px;
+    font-family:Consolas,monospace;font-size:11px;color:#1F2937}
+
+  /* cửa sổ Terminal của macOS */
+  .mac{width:560px;border-radius:9px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.3)}
+  .mac .bar{background:linear-gradient(#e8e8e8,#d3d3d3);padding:7px 12px;display:flex;
+    align-items:center;gap:7px;font-size:12px;color:#4a4a4a}
+  .mac .bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .mac .bar .t{flex:1;text-align:center;font-size:11.5px;margin-right:40px}
+  .mac .scr{background:#1c1c1e;color:#e6e6e6;padding:14px 16px;
+    font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.62;white-space:pre}
+  .mac .scr b{color:#fff}
+  .mac .scr .d{color:#8b8b90}
+  .mac .scr .g{color:#5fd88a}
+  .mac .scr .cur{background:#e6e6e6;color:#1c1c1e}
+  .pvnote{margin:12px 0 0;font-size:13px;color:var(--muted)}
+
+  .dl{display:inline-block;padding:14px 18px;border:1px solid var(--line);
+      border-radius:8px;text-decoration:none;color:var(--ink);background:#fff;margin:8px 10px 0 0}
+  .dl b{display:block;font-size:15px}
+  .dl span{color:var(--muted);font-size:12.5px}
+  .spin{display:none}
+  .busy .spin{display:inline}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Chọn nhà mạng ra Internet — trang quản trị</h1>
+  <p>Điền thông tin router, đặt tên nhà mạng, áp dụng. Xong là tải bộ cài cho máy con.</p>
+</header>
+
+<main>
+
+<!-- ---------------------------------------------------------------- 1 -->
+<section class="card" id="c1">
+  <h2><span class="n">1</span>Kết nối tới router</h2>
+  <p class="hint">Nên dùng SSH key thay cho mật khẩu. Thông tin này chỉ nằm trên máy bạn,
+     không bao giờ được đưa vào bộ cài của máy con.</p>
+  <div class="grid">
+    <div><label>Địa chỉ router</label><input type="text" id="host" value="192.168.88.1"></div>
+    <div><label>Cổng SSH</label><input type="number" id="port" value="22"></div>
+    <div><label>Tài khoản</label><input type="text" id="user" value="admin"></div>
+    <div><label>Cách đăng nhập</label>
+      <select id="authMode">
+        <option value="key">Khoá SSH (an toàn hơn)</option>
+        <option value="password">Mật khẩu</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="keyBlock" style="margin-top:14px">
+    <label>Khoá SSH</label>
+    <select id="keyPick"><option>Đang tìm khoá trên máy…</option></select>
+    <input type="file" id="keyFile" style="display:none">
+    <input type="text" id="keyPath" placeholder="vd: C:\Users\ban\.ssh\id_rsa"
+           style="display:none;margin-top:8px">
+    <p class="note" id="keyNote">Chọn file <b>không có đuôi .pub</b>. File .pub là khoá công khai, dùng để nạp lên router.</p>
+    <div class="row" style="margin-top:10px">
+      <button id="bGenKey" class="ghost" type="button">Chưa có khoá? Tạo khoá mới</button>
+    </div>
+    <div id="keyOut"></div>
+  </div>
+
+  <div id="passBlock" style="margin-top:14px;display:none">
+    <label>Mật khẩu tài khoản router</label>
+    <input type="password" id="password" autocomplete="off">
+    <p class="note">Nếu tài khoản này đã được nạp khoá SSH thì RouterOS sẽ
+       <b>tự khoá đăng nhập bằng mật khẩu</b> cho chính tài khoản đó — khi đó phải dùng khoá.</p>
+  </div>
+
+  <div class="row">
+    <button id="bSurvey">Kết nối &amp; khảo sát</button>
+    <span class="spin">Đang kết nối…</span>
+  </div>
+  <div id="m1"></div>
+</section>
+
+<!-- ---------------------------------------------------------------- 2 -->
+<section class="card off" id="c2">
+  <h2><span class="n">2</span>Đặt tên nhà mạng và lựa chọn</h2>
+  <p class="hint">Tên nhà mạng đã được tra tự động từ IP public. Sửa lại nếu cần —
+     đây chính là chữ hiện trên nút bấm của máy con.</p>
+  <div id="routerInfo"></div>
+  <table id="wanTable"></table>
+
+  <h2 style="margin-top:24px;font-size:15px">Các nút sẽ hiện trên máy con</h2>
+  <table id="profTable"></table>
+
+  <div id="pinBox"></div>
+
+  <h2 style="margin-top:26px;font-size:15px">Máy con sẽ thấy như thế này</h2>
+  <div class="pvtabs">
+    <button class="pvtab on" data-os="win" type="button">Windows</button>
+    <button class="pvtab" data-os="mac" type="button">macOS / Linux</button>
+  </div>
+  <div class="pvwrap"><div id="preview"></div></div>
+  <p class="pvnote" id="pvnote"></p>
+
+  <div class="grid" style="margin-top:18px">
+    <div><label>Tiêu đề cửa sổ trên máy con</label>
+         <input type="text" id="sysname" value="Chọn nhà mạng ra Internet"></div>
+    <div><label>Nhãn cấu hình trên router</label><input type="text" id="tag" value="WANSEL"></div>
+    <div style="align-self:end"><label>
+      <input type="checkbox" id="failover" style="width:auto"> Tự rớt sang đường còn lại khi đứt mạng
+    </label></div>
+  </div>
+  <div class="row">
+    <button id="bPlan">Xem trước những gì sẽ thay đổi</button>
+    <span class="spin">Đang tính…</span>
+  </div>
+  <div id="m2"></div>
+</section>
+
+<!-- ---------------------------------------------------------------- 3 -->
+<section class="card off" id="c3">
+  <h2><span class="n">3</span>Xem trước rồi áp dụng</h2>
+  <p class="hint">Trước khi ghi, tool tự backup cấu hình về máy bạn và bật dead-man switch:
+     nếu mất kết nối giữa chừng, router tự hoàn tác sau 5 phút.</p>
+  <div id="planOut"></div>
+  <div class="row">
+    <button id="bApply">Áp dụng lên router</button>
+    <button id="bRollback" class="danger">Hoàn tác</button>
+    <span class="spin">Đang thực hiện, đừng đóng cửa sổ…</span>
+  </div>
+  <div id="m3"></div>
+</section>
+
+<!-- ---------------------------------------------------------------- 4 -->
+<section class="card off" id="c4">
+  <h2><span class="n">4</span>Bộ cài cho máy con</h2>
+  <p class="hint">Chép nguyên thư mục (hoặc file zip) sang máy cần dùng rồi bấm đúp.
+     Máy con không cần biết gì về router.</p>
+  <div id="pkgOut"></div>
+</section>
+
+<section class="card" id="cAbout">
+  <h2>Giới thiệu</h2>
+  <p class="hint" style="margin-bottom:10px">Công cụ chọn nhà mạng ra Internet cho mạng dùng MikroTik.</p>
+  <p style="margin:0 0 6px">Khám phá thêm nhiều phần mềm tại:
+     <a href="https://trinhleminhan.com/tools" target="_blank" rel="noopener">trinhleminhan.com/tools</a></p>
+  <p style="margin:0">Muốn dựng công cụ / phần mềm riêng? Gửi liên hệ tại:
+     <a href="https://trinhleminhan.com/lien-he/" target="_blank" rel="noopener">trinhleminhan.com/lien-he</a></p>
+</section>
+
+</main>
+
+<script>
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let SURVEY = null;
+
+function busy(card, on){ $(card).classList.toggle('busy', on);
+  $$(card+' button').forEach(b => b.disabled = on); }
+function enable(card, on){ $(card).classList.toggle('off', !on); }
+function msg(where, kind, text){
+  $(where).innerHTML = text ? `<div class="msg ${kind}">${text}</div>` : ''; }
+
+/* Lỗi kết nối đã được phần lõi diễn giải sang tiếng Việt kèm các việc nên làm.
+   Chi tiết kỹ thuật gấp lại, ai cần mới mở. */
+function showErr(where, d){
+  const hints = (d.hints || []).map(h => `<li>${esc(h)}</li>`).join('');
+  $(where).innerHTML = `<div class="msg err"><b>${esc(d.error)}</b>` +
+    (hints ? `<ul>${hints}</ul>` : '') +
+    (d.detail ? `<details><summary>Chi tiết kỹ thuật</summary><code>${esc(d.detail)}</code></details>` : '') +
+    `</div>`;
+}
+function esc(s){ return String(s ?? '').replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function post(path, body){
+  const r = await fetch(path, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  return r.json();
+}
+
+/* ---------------- chọn khoá SSH ---------------- */
+let KEYDATA = null;          // nội dung file khi người dùng chọn bằng hộp thoại
+
+function routerPayload(){
+  const base = {host:$('#host').value, port:+$('#port').value, user:$('#user').value};
+  if ($('#authMode').value === 'password')
+    return {...base, key:'', key_data:'', password:$('#password').value};
+
+  const pick = $('#keyPick').value;
+  if (pick === '__browse__') return {...base, key:'', key_data:KEYDATA||'', password:''};
+  if (pick === '__manual__') return {...base, key:$('#keyPath').value, key_data:'', password:''};
+  return {...base, key:pick, key_data:'', password:''};
+}
+
+$('#authMode').onchange = () => {
+  const isKey = $('#authMode').value === 'key';
+  $('#keyBlock').style.display  = isKey ? '' : 'none';
+  $('#passBlock').style.display = isKey ? 'none' : '';
+};
+
+$('#keyPick').onchange = () => {
+  const v = $('#keyPick').value;
+  $('#keyPath').style.display = (v === '__manual__') ? '' : 'none';
+  if (v === '__browse__') $('#keyFile').click();
+  else if (v !== '__manual__') KEYDATA = null;
+};
+
+$('#keyFile').onchange = async () => {
+  const f = $('#keyFile').files[0];
+  if (!f) { $('#keyPick').selectedIndex = 0; return; }
+  if (f.name.endsWith('.pub')) {
+    $('#keyNote').innerHTML =
+      `<b style="color:#b91c1c">Bạn vừa chọn ${esc(f.name)} — đây là khoá CÔNG KHAI.</b>
+       Cần chọn file cùng tên nhưng <b>không có đuôi .pub</b>.`;
+    $('#keyPick').selectedIndex = 0; KEYDATA = null; return;
+  }
+  KEYDATA = await f.text();
+  $('#keyNote').innerHTML = `Đang dùng khoá từ file <b>${esc(f.name)}</b>
+      <span style="color:#6b7280">(${f.size} bytes)</span>`;
+};
+
+/* ---------------- tạo khoá SSH ngay trong app ----------------
+   Không bắt người dùng đi tìm ssh-keygen, không bắt gõ lệnh. Tạo xong hiện luôn
+   khoá công khai, nút tải file, và hai đường nạp vào router: tự động hoặc thủ
+   công qua Winbox. */
+let NEWKEY = null;
+
+$('#bGenKey').onclick = async () => {
+  const btn = $('#bGenKey');
+  btn.disabled = true; btn.textContent = 'Đang tạo khoá…';
+  const name = 'wanselector-' + new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const d = await post('/api/genkey', {name, kind:'rsa', bits:2048, user:$('#user').value});
+  btn.disabled = false; btn.textContent = 'Chưa có khoá? Tạo khoá mới';
+
+  if (d.error) return showErr('#keyOut', d);
+  NEWKEY = d.key;
+  await loadKeys();
+  const opt = [...$('#keyPick').options].find(o => o.value === d.key.private);
+  if (opt) $('#keyPick').value = d.key.private;      // chọn sẵn khoá vừa tạo
+
+  $('#keyOut').innerHTML = `
+    <div class="msg ok">
+      <b>Đã tạo khoá ${esc(d.key.kind)}</b> — và đã chọn sẵn ở ô trên.<br>
+      Khoá riêng: <span class="mono">${esc(d.key.private)}</span>
+      <span style="opacity:.8">(giữ trên máy bạn, không đưa cho ai)</span>
+    </div>
+
+    <p class="note" style="margin-top:12px"><b>Cách 1 — để tool tự nạp lên router.</b>
+       Cần đăng nhập được bằng mật khẩu một lần. Tool sẽ nạp rồi <b>đăng nhập thử lại
+       bằng khoá</b>; nếu không vào được thì tự gỡ khoá ra, router y như cũ.</p>
+    <div class="row" style="margin-top:6px">
+      <button id="bInstallKey" type="button">Nạp khoá lên router ngay</button>
+      <span class="spin">Đang nạp…</span>
+    </div>
+
+    <p class="note" style="margin-top:14px"><b>Cách 2 — làm tay bằng Winbox:</b></p>
+    <ol style="margin:6px 0 0 18px;padding:0;font-size:13.5px;line-height:1.8">
+      <li>Tải file khoá công khai:
+        <a href="/download-key?f=${encodeURIComponent(d.key.filename)}">${esc(d.key.filename)}</a></li>
+      <li>Winbox → <b>Files</b> → kéo thả file đó vào cửa sổ</li>
+      <li>Winbox → <b>New Terminal</b> → dán lệnh:
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input type="text" id="impCmd" readonly value="${esc(d.key.import_cmd)}"
+                 style="flex:1;font-family:Consolas,monospace;font-size:12.5px">
+          <button type="button" class="ghost" id="bCopyCmd">Chép</button>
+        </div></li>
+      <li>Xong. Quay lại đây bấm <b>Kết nối &amp; khảo sát</b>.</li>
+    </ol>
+
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:13px">
+      Xem nội dung khoá công khai</summary>
+      <pre style="max-height:120px">${esc(d.key.public_text)}</pre></details>
+
+    <div class="msg warn" style="margin-top:12px">
+      Sau khi nạp khoá, RouterOS <b>tự tắt đăng nhập bằng mật khẩu</b> cho tài khoản đó —
+      đây là hành vi của RouterOS, không phải của tool. Giữ kỹ file khoá riêng.
+    </div>`;
+
+  $('#bCopyCmd').onclick = () => {
+    $('#impCmd').select(); document.execCommand('copy');
+    $('#bCopyCmd').textContent = 'Đã chép';
+    setTimeout(() => $('#bCopyCmd').textContent = 'Chép', 1500);
+  };
+
+  $('#bInstallKey').onclick = async () => {
+    if ($('#authMode').value !== 'password' && !$('#password').value) {
+      return alert('Để tool tự nạp khoá, cần đăng nhập bằng mật khẩu một lần.\\n' +
+                   'Chọn "Mật khẩu" ở ô "Cách đăng nhập" và nhập mật khẩu router.');
+    }
+    const b = $('#bInstallKey'); b.disabled = true; b.textContent = 'Đang nạp…';
+    const r = await post('/api/installkey', {
+      ...routerPayload(), password: $('#password').value,
+      key: '', key_data: '',
+      private: NEWKEY.private, public: NEWKEY.public,
+    });
+    b.disabled = false; b.textContent = 'Nạp khoá lên router ngay';
+    if (r.error) return showErr('#keyOut', r);
+
+    const steps = (r.steps || []).map(s => `<li>${esc(s)}</li>`).join('');
+    $('#keyOut').innerHTML += `<div class="msg ${r.ok ? 'ok' : 'err'}" style="margin-top:12px">
+      <b>${esc(r.message)}</b>${steps ? `<ul>${steps}</ul>` : ''}</div>`;
+    if (r.ok) {                       // chuyển sang dùng khoá cho các bước sau
+      $('#authMode').value = 'key';
+      $('#authMode').onchange();
+      $('#keyPick').value = NEWKEY.private;
+      $('#password').value = '';
+    }
+  };
+};
+
+async function loadKeys(){
+  const sel = $('#keyPick');
+  let list = [];
+  try { list = (await post('/api/keys', {})).keys || []; } catch(e){}
+  sel.innerHTML =
+    (list.length
+      ? list.map(k => `<option value="${esc(k.path)}">${esc(k.name)} — ${esc(k.type)} (${esc(k.where)})</option>`).join('')
+      : `<option value="__browse__">Chưa tìm thấy khoá nào — bấm để chọn file…</option>`) +
+    `<option value="__browse__">Chọn file khác từ máy…</option>` +
+    `<option value="__manual__">Nhập đường dẫn thủ công…</option>`;
+  if (!list.length) $('#keyNote').innerHTML =
+    'Không tìm thấy khoá SSH nào trong <span class="mono">~/.ssh</span>. Chọn file từ máy, hoặc chuyển sang đăng nhập bằng mật khẩu.';
+}
+loadKeys();
+
+/* ---------------- bước 1: khảo sát ---------------- */
+$('#bSurvey').onclick = async () => {
+  busy('#c1', true); msg('#m1','','');
+  const d = await post('/api/survey', routerPayload());
+  busy('#c1', false);
+  if (d.error) return showErr('#m1', d);
+  SURVEY = d;
+  renderSurvey(d);
+  enable('#c2', true);
+  $('#c2').scrollIntoView({behavior:'smooth', block:'start'});
+};
+
+/* Cảnh báo phiên bản RouterOS. Chỉ hiện khi có gì đáng nói — bản mới và đủ chỗ
+   trống thì không làm phiền. */
+function verdictHtml(v){
+  if (!v) return '';
+  const kind = v.level === 'ok' ? '' : (v.level === 'blocked' ? 'err' : 'warn');
+  const bits = [];
+  if (kind) {
+    const hints = (v.hints || []).map(h => `<li>${esc(h)}</li>`).join('');
+    bits.push(`<div class="msg ${kind}"><b>${esc(v.title)}</b>` +
+              (hints ? `<ul>${hints}</ul>` : '') + `</div>`);
+  }
+  if (v.disk) bits.push(`<div class="msg warn">${esc(v.disk)}</div>`);
+  return bits.join('');
+}
+
+function renderSurvey(d){
+  $('#routerInfo').innerHTML = `
+    <div class="msg ok">
+      <b>${esc(d.router.identity)}</b> — ${esc(d.router.board)}, RouterOS ${esc(d.router.version)}<br>
+      LAN <b>${esc(d.lan.interface)}</b> ${esc(d.lan.subnet)} (gateway ${esc(d.lan.gateway)}),
+      ổ đĩa trống ${d.router.free_mb} MiB
+    </div>` +
+    verdictHtml(d.version) +
+    (d.downstream.length ? `<div class="msg warn">
+      Phát hiện router phụ dưới LAN: ${d.downstream.map(x=>esc(x.gw)+' → '+esc(x.net)).join(', ')}.
+      Máy nằm <b>sau</b> các router đó sẽ không đổi được gateway (bị NAT lần hai).
+    </div>` : '');
+
+  $('#wanTable').innerHTML =
+    `<tr><th>Cổng trên router</th><th>IP public</th><th>Tên hiển thị</th><th>Màu nút</th></tr>` +
+    d.wans.map((w,i) => `<tr>
+        <td class="mono">${esc(w.interface)} ${w.running?'':'<b style="color:#b45309">(không kết nối)</b>'}</td>
+        <td class="mono">${esc(w.ip)}</td>
+        <td><input type="text" class="wname" data-i="${i}" value="${esc(w.name)}"></td>
+        <td><input type="color" class="wcolor" data-i="${i}" value="${esc(w.color)}"></td>
+      </tr>`).join('');
+
+  drawProfiles();
+  $$('.wname').forEach(el => el.oninput = drawProfiles);
+  $$('.wcolor').forEach(el => el.oninput = drawPreview);
+  $('#sysname').oninput = drawPreview;
+}
+
+/* Mỗi lần đổi tên nhà mạng thì tên nút gợi ý cũng đổi theo, trừ nút người dùng đã tự sửa */
+function drawProfiles(){
+  const names = $$('.wname').map(e => e.value);
+  const old = {}; $$('.pname').forEach(e => old[e.dataset.k] = {v:e.value, edited:e.dataset.edited});
+  const onOld = {}; $$('.pon').forEach(e => onOld[e.dataset.k] = e.checked);
+
+  const colors = $$('.wcolor').map(e => e.value);
+  const oldC = {}; $$('.pcolor').forEach(e => oldC[e.dataset.k] = {v:e.value, edited:e.dataset.edited});
+
+  const rows = SURVEY.profiles.map((p, i) => {
+    const k = p.wans.join('|') || '__default__';
+    let auto = p.wans.length === 0 ? 'Mặc định'
+             : p.wans.map(w => names[SURVEY.wans.findIndex(x=>x.interface===w)] ?? w).join(' + ');
+    const cur = old[k];
+    const val = (cur && cur.edited === '1') ? cur.v : auto;
+    const on  = (k in onOld) ? onOld[k] : true;
+
+    // Màu gợi ý: một WAN thì lấy màu WAN đó, nhiều WAN thì pha trung bình.
+    // Admin sửa tay thì giữ nguyên lựa chọn của admin.
+    const idxs = p.wans.map(w => SURVEY.wans.findIndex(x => x.interface === w));
+    const autoC = p.wans.length === 0 ? '#546E7A' : blend(idxs.map(j => colors[j]));
+    const curC = oldC[k];
+    const valC = (curC && curC.edited === '1') ? curC.v : autoC;
+
+    const what = p.wans.length === 0 ? 'Giữ nguyên hành vi mặc định của router'
+               : p.wans.length === 1 ? 'Đi riêng một đường'
+               : 'Chia tải giữa các đường được chọn';
+    return `<tr>
+      <td style="width:40px"><input type="checkbox" class="pon" data-k="${k}" ${on?'checked':''}
+            ${p.wans.length===0?'disabled title="Nút mặc định luôn có"':''}></td>
+      <td><input type="text" class="pname" data-k="${k}" data-i="${i}" value="${esc(val)}"></td>
+      <td style="width:56px"><input type="color" class="pcolor" data-k="${k}"
+            value="${esc(valC)}" ${curC && curC.edited === '1' ? 'data-edited="1"' : ''}></td>
+      <td class="mono" style="color:#6b7280">${esc(p.wans.join(' + ') || '—')}</td>
+      <td style="color:#6b7280">${what}</td>
+    </tr>`;
+  }).join('');
+
+  $('#profTable').innerHTML =
+    `<tr><th></th><th>Chữ trên nút</th><th>Màu</th><th>Đi qua cổng</th><th>Ý nghĩa</th></tr>` + rows;
+  $$('.pcolor').forEach(e => e.oninput = () => { e.dataset.edited = '1'; drawPreview(); });
+  drawPins();
+  $$('.pname').forEach(e => e.oninput = () => { e.dataset.edited = '1'; drawPreview(); });
+  $$('.pon').forEach(e => e.onchange = drawPreview);
+  drawPreview();
+}
+
+/* ---------------- ghim máy nằm sau router phụ ----------------
+   Máy sau một router có NAT thì không tự chọn được: khi lên tới MikroTik, mọi
+   máy phía sau đều mang chung một địa chỉ nguồn. Thứ làm được là ghim CẢ CỤM
+   vào một nhà mạng cố định — định tuyến theo địa chỉ nguồn thay vì gateway. */
+function drawPins(){
+  const nat = (SURVEY.downstream || []).filter(d => d.kind === 'nat');
+  if (!nat.length) { $('#pinBox').innerHTML = ''; return; }
+
+  const opts = $$('.pon').filter(c => c.checked).map(c => {
+    const el = $$('.pname').find(e => e.dataset.k === c.dataset.k);
+    const src = SURVEY.profiles[+el.dataset.i];
+    return src.wans.length ? el.value.trim() : null;      // không ghim vào Mặc định
+  }).filter(Boolean);
+
+  const old = {}; $$('.pinsel').forEach(e => old[e.dataset.ip] = e.value);
+
+  $('#pinBox').innerHTML = `
+    <h2 style="margin-top:26px;font-size:15px">Máy nằm sau router phụ</h2>
+    <div class="msg warn" style="margin-top:8px">
+      Những thiết bị dưới đây đang <b>NAT hộ nhiều máy khác</b>. Máy nằm sau chúng
+      <b>không đổi được nhà mạng bằng gateway</b> — lên tới MikroTik thì mọi máy đều
+      chung một địa chỉ nguồn, không phân biệt được ai với ai.<br><br>
+      <b>Cách triệt để:</b> chuyển thiết bị đó sang chế độ Bridge / Access Point, khi đó
+      máy con nhận IP thẳng từ MikroTik và dùng được như máy cắm trực tiếp.<br>
+      <b>Cách nhanh:</b> ghim cả cụm vào một nhà mạng cố định ở bảng dưới. Không chọn
+      được theo từng máy, nhưng ít nhất kiểm soát được cả cụm.
+    </div>
+    <table><tr><th>Thiết bị</th><th>Vì sao nghi ngờ</th><th style="width:190px">Ghim cả cụm vào</th></tr>` +
+    nat.map(d => `<tr>
+      <td class="mono"><b>${esc(d.address)}</b>${d.hostname ? '<br>' + esc(d.hostname) : ''}
+        ${d.serves.length ? '<br><span style="color:#6b7280">phục vụ ' + esc(d.serves.join(', ')) + '</span>' : ''}</td>
+      <td style="color:#6b7280;font-size:13px">${d.reasons.map(esc).join('<br>')}</td>
+      <td><select class="pinsel" data-ip="${esc(d.address)}" data-name="${esc(d.hostname || d.address)}">
+        <option value="">— không ghim —</option>
+        ${opts.map(o => `<option value="${esc(o)}" ${old[d.address] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}
+      </select></td></tr>`).join('') + `</table>`;
+}
+
+/* ---------------- xem trước giao diện máy con ----------------
+   Dựng lại đúng những gì client thật sẽ vẽ, để admin thấy ngay chữ mình gõ
+   sẽ hiện ra sao — và thấy được Windows với macOS khác nhau thế nào. */
+let PVOS = 'win';
+$$('.pvtab').forEach(t => t.onclick = () => {
+  $$('.pvtab').forEach(x => x.classList.toggle('on', x === t));
+  PVOS = t.dataset.os; drawPreview();
+});
+
+/* Cùng công thức với core/plan.py: một WAN thì lấy màu WAN đó, nhiều WAN thì pha trung bình */
+function blend(cols){
+  if (!cols.length) return '#546E7A';
+  if (cols.length === 1) return cols[0];
+  const s = [0,0,0];
+  for (const c of cols){
+    const h = c.replace('#','');
+    for (let i=0;i<3;i++) s[i] += parseInt(h.substr(i*2,2),16);
+  }
+  return '#' + s.map(v => Math.round(v/cols.length).toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+
+/* Cùng công thức với core/plan.py:_detail */
+function liveProfiles(){
+  const names  = $$('.wname').map(e => e.value.trim());
+  const colors = $$('.wcolor').map(e => e.value);
+  const out = [];
+  $$('.pon').forEach(chk => {
+    if (!chk.checked) return;
+    const nameEl = $$('.pname').find(e => e.dataset.k === chk.dataset.k);
+    const src = SURVEY.profiles[+nameEl.dataset.i];
+    const idxs = src.wans.map(w => SURVEY.wans.findIndex(x => x.interface === w));
+    const wnames = idxs.map(i => names[i] || SURVEY.wans[i].interface);
+    const colEl = $$('.pcolor').find(e => e.dataset.k === chk.dataset.k);
+    out.push({
+      name: nameEl.value.trim() || src.name,
+      is_default: src.wans.length === 0,
+      color: colEl ? colEl.value : (src.wans.length === 0 ? '#546E7A' : blend(idxs.map(i => colors[i]))),
+      detail: src.wans.length === 0 ? 'Giữ nguyên hành vi mặc định của router'
+            : src.wans.length === 1 ? `Đi riêng qua đường ${wnames[0]}`
+            : `Chia tải giữa ${wnames.join(' + ')}`,
+    });
+  });
+  return out;
+}
+
+function drawPreview(){
+  if (!SURVEY) return;
+  const ps    = liveProfiles();
+  const title = $('#sysname').value.trim() || 'Chọn nhà mạng ra Internet';
+  const gw    = SURVEY.lan.gateway || '192.168.88.1';
+  const pre3  = gw.split('.').slice(0,3).join('.');
+  const sampleIp = pre3 + '.100';
+  const defName  = (ps.find(p => p.is_default) || {}).name || 'Mặc định';
+
+  if (PVOS === 'win'){
+    $('#preview').innerHTML = `<div class="win">
+      <div class="bar"><span>${esc(title)}</span>
+        <span class="sq"><i>—</i><i>□</i><i>✕</i></span></div>
+      <div class="hd">${esc(title.toUpperCase())}</div>
+      <div class="body">
+        <div class="st">Card mạng  :  Ethernet
+IP của PC  :  ${esc(sampleIp)}
+Đang dùng  :  ${esc(defName)}   (gateway ${esc(gw)})</div>
+        ${ps.map(p => `<div class="btn" style="background:${esc(p.color)}">${esc(p.name)}
+          <small>${esc(p.detail)}</small></div>`).join('')}
+        <div style="display:flex;gap:8px">
+          <div class="chk" style="flex:1">Kiểm tra IP public đang dùng</div>
+          <div class="chk" style="width:110px">Giới thiệu</div>
+        </div>
+        <div class="lgl">Nhật ký</div>
+        <div class="lg">[09:14:22]  Sẵn sàng. Bấm một nút để đổi hướng ra Internet.</div>
+        <div class="ft">Thêm phần mềm: <a>trinhleminhan.com/tools</a>
+          &nbsp;•&nbsp; Đặt làm công cụ riêng: <a>trinhleminhan.com/lien-he</a></div>
+      </div></div>`;
+    $('#pvnote').innerHTML =
+      'Cửa sổ tự co giãn theo số nút. Lựa chọn được <b>ghi nhớ qua cả khởi động lại máy</b>. ' +
+      'Máy có <b>nhiều card mạng</b> cùng nằm trong lớp mạng này thì hiện thêm ô chọn card ở trên cùng.';
+    return;
+  }
+
+  const pad = s => s + ' '.repeat(Math.max(0, 22 - [...s].length));
+  const rows = ps.map((p,i) =>
+    `  <b>${i+1}</b>) ${esc(pad(p.name))}<span class="d">${esc(p.detail)}</span>`).join('\n');
+
+  $('#preview').innerHTML = `<div class="mac">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i>
+      <i style="background:#28c840"></i><span class="t">wanswitch — bash</span></div>
+    <div class="scr"><span class="d">$</span> ./ChonNhaMang.command
+
+<b>${esc(title)}</b>
+──────────────────────────────────────────────
+  Card mạng : en0 (${esc(sampleIp)})
+  Gateway   : ${esc(gw)}  →  ${esc(defName)}
+
+${rows}
+  <b>k</b>) Kiểm tra IP public đang dùng
+  <b>c</b>) Chọn card mạng dùng để đổi   <span class="d">(chỉ hiện khi máy nhiều card)</span>
+  <b>g</b>) Giới thiệu
+  <b>0</b>) Thoát
+
+<span class="d">  Thêm phần mềm: https://trinhleminhan.com/tools</span>
+<span class="d">  Đặt làm công cụ riêng: https://trinhleminhan.com/lien-he/</span>
+
+Chọn: <span class="cur"> </span></div></div>`;
+  $('#pvnote').innerHTML =
+    'Trên macOS, bấm đúp mở <b>Terminal</b> với menu gõ số — không phải cửa sổ nút bấm như Windows. ' +
+    'Máy sẽ hỏi mật khẩu <span class="mono">sudo</span> khi đổi. ' +
+    'Lựa chọn <b>không được ghi nhớ lâu dài</b>: rút/cắm dây mạng hoặc khởi động lại là quay về mặc định.';
+}
+
+/* ---------------- gom cấu hình từ form ---------------- */
+function configPayload(){
+  const names  = $$('.wname').map(e => e.value.trim());
+  const colors = $$('.wcolor').map(e => e.value);
+  const wans = SURVEY.wans.map((w,i) => ({interface:w.interface, name:names[i]||w.interface, color:colors[i]}));
+
+  const profiles = [];
+  $$('.pon').forEach(chk => {
+    if (!chk.checked) return;
+    const k = chk.dataset.k;
+    const nameEl = $$('.pname').find(e => e.dataset.k === k);
+    const src = SURVEY.profiles[+nameEl.dataset.i];
+    const colEl = $$('.pcolor').find(e => e.dataset.k === k);
+    profiles.push({name: nameEl.value.trim() || src.name, wans: src.wans,
+                   color: colEl ? colEl.value : undefined});
+  });
+
+  const pinned = $$('.pinsel').filter(s => s.value).map(s => ({
+    name: s.dataset.name, match: [s.dataset.ip], profile: s.value,
+  }));
+
+  return {
+    router: routerPayload(),
+    pinned,
+    tag: $('#tag').value.trim() || 'WANSEL',
+    lan: SURVEY.lan,
+    system_name: $('#sysname').value.trim() || 'Chọn nhà mạng ra Internet',
+    failover: $('#failover').checked,
+    wans, profiles,
+  };
+}
+
+/* ---------------- bước 2: xem trước ---------------- */
+$('#bPlan').onclick = async () => {
+  busy('#c2', true); msg('#m2','','');
+  const d = await post('/api/plan', configPayload());
+  busy('#c2', false);
+  if (d.error) return showErr('#m2', d);
+  renderPlan(d);
+  enable('#c3', true);
+  $('#c3').scrollIntoView({behavior:'smooth', block:'start'});
+};
+
+function renderPlan(d){
+  let html = '';
+  if (d.errors?.length)
+    html += `<div class="msg err"><b>Chưa thể áp dụng:</b><br>${d.errors.map(esc).join('<br>')}</div>`;
+  if (d.warnings?.length)
+    html += `<div class="msg warn"><b>Lưu ý:</b><br>${d.warnings.map(esc).join('<br><br>')}</div>`;
+
+  html += `<table><tr><th>Nút</th><th>Gateway máy con sẽ đặt</th><th>VRID</th><th>Bảng định tuyến</th></tr>` +
+    d.allocations.map(a => `<tr>
+      <td>${esc(a.name)}</td><td class="mono"><b>${esc(a.gateway)}</b></td>
+      <td class="mono">${a.vrid ?? '—'}</td>
+      <td class="mono">${esc(a.table ?? '(giữ nguyên)')}</td></tr>`).join('') + `</table>`;
+
+  const n = d.commands.filter(c => !c.trimStart().startsWith('#')).length;
+  html += `<p style="margin:16px 0 0;font-size:13px;color:#6b7280">${n} lệnh sẽ chạy trên router:</p>`;
+  html += `<pre>${d.commands.map(c =>
+      c.trimStart().startsWith('#') ? `<span class="c">${esc(c)}</span>` : esc(c)).join('\n')}</pre>`;
+
+  $('#planOut').innerHTML = html;
+  $('#bApply').disabled = !d.ok;
+}
+
+/* ---------------- bước 3: áp dụng ---------------- */
+$('#bApply').onclick = async () => {
+  busy('#c3', true); msg('#m3','','');
+  const d = await post('/api/apply', configPayload());
+  busy('#c3', false);
+  if (d.error) return showErr('#m3', d);
+
+  const list = (d.steps||[]).map(s =>
+    `<li><span class="i">${s.ok?'✔':'✗'}</span> ${esc(s.name)}` +
+    (s.detail ? ` <span class="d">— ${esc(s.detail)}</span>` : '') + `</li>`).join('');
+  $('#m3').innerHTML =
+    `<div class="msg ${d.ok?'ok':'err'}">${d.ok
+      ? 'Áp dụng thành công. Cấu hình cũ của router không bị đụng tới.'
+      : 'Có bước không đạt — xem chi tiết bên dưới.'}</div><ul class="steps">${list}</ul>`;
+
+  if (d.backup_dir)
+    $('#m3').innerHTML += `<div class="msg ok" style="margin-top:10px">
+      <b>Bản backup đã tải về máy bạn</b><br>
+      Thư mục: <span class="mono">${esc(d.backup_dir)}</span><br>
+      File: <span class="mono">${(d.backup_files||[]).map(esc).join(', ')}</span><br>
+      File <span class="mono">.backup</span> dùng để khôi phục nguyên trạng qua Winbox
+      (Files → kéo file vào → chọn file → Restore). File <span class="mono">.rsc</span>
+      là bản text để đối chiếu.</div>`;
+
+  if (d.ok) { await makePackages(); enable('#c4', true);
+              $('#c4').scrollIntoView({behavior:'smooth', block:'start'}); }
+};
+
+$('#bRollback').onclick = async () => {
+  if (!confirm('Gỡ toàn bộ cấu hình do tool này tạo ra?\nCấu hình sẵn có của router không bị ảnh hưởng.')) return;
+  busy('#c3', true);
+  const d = await post('/api/rollback', configPayload());
+  busy('#c3', false);
+  if (d.error) showErr('#m3', d); else msg('#m3','ok', esc(d.message));
+};
+
+/* ---------------- bước 4: đóng gói ---------------- */
+async function makePackages(){
+  const d = await post('/api/package', configPayload());
+  if (d.error || !d.ok)
+    return $('#pkgOut').innerHTML = `<div class="msg err">${esc(d.error || (d.errors||[]).join(', '))}</div>`;
+
+  $('#pkgOut').innerHTML =
+    d.files.map(f => `<a class="dl" href="/download?f=${encodeURIComponent(f.name)}">
+        <b>⬇ ${esc(f.label)}</b><span>${esc(f.name)}</span></a>`).join('') +
+    `<p style="font-size:13px;color:#6b7280;margin-top:14px">
+       Bản chưa nén nằm ở <span class="mono">${esc(d.folder)}</span> — tiện chép thẳng qua USB.</p>` +
+    `<table><tr><th>Nút trên máy con</th><th>Gateway</th><th>Ý nghĩa</th></tr>` +
+    d.profiles.profiles.map(p => `<tr>
+        <td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;
+             background:${esc(p.color)};margin-right:8px"></span>${esc(p.name)}</td>
+        <td class="mono">${esc(p.gateway)}</td><td style="color:#6b7280">${esc(p.detail)}</td>
+      </tr>`).join('') + `</table>`;
+}
+</script>
+</body>
+</html>

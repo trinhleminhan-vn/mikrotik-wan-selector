@@ -1,0 +1,10 @@
+logs/
+keys/
+*.pem
+id_rsa*
+backup/
+dist/
+__pycache__/
+*.pyc
+cauhinh*.yaml
+!examples/*.yaml

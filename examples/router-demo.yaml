@@ -1,0 +1,35 @@
+# File cấu hình sinh tự động từ hiện trạng router.
+# Sửa lại tên nhà mạng / thêm bớt profile rồi chạy:  wanctl.py plan -c router-demo.yaml
+
+router:
+  host: 192.168.88.1
+  port: 22
+  user: admin
+  key: ~/.ssh/id_rsa
+tag: WANSEL
+prefix: sel
+lan:
+  interface: bridgeLAN
+  subnet: 192.168.88.0/24
+  gateway: 192.168.88.1
+system_name: Chọn nhà mạng ra Internet
+failover: false
+wans:
+- interface: pppoe-out1
+  name: Viettel
+  color: '#EE0033'
+- interface: pppoe-out2
+  name: VNPT
+  color: '#0068B3'
+profiles:
+- name: Viettel
+  wans:
+  - pppoe-out1
+- name: VNPT
+  wans:
+  - pppoe-out2
+- name: Viettel + VNPT
+  wans:
+  - pppoe-out1
+  - pppoe-out2
+- name: Mặc định
