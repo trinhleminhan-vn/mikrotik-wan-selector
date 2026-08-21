@@ -376,8 +376,15 @@ Không ghi ở cạnh script, vì thư mục có thể chỉ đọc (chép từ 
 Đây là ca hỏng phổ biến nhất, và nó **không phải lỗi router**: lệnh thêm route
 chạy xong sạch sẽ, nhưng hệ điều hành vẫn chọn một default route khác để đi.
 
-Windows chọn đường theo **metric hiệu dụng = RouteMetric + InterfaceMetric**,
-thấp hơn thì thắng. Route tool thêm vào (`metric 1`) chỉ chắc chắn thắng route
+Windows chọn đường theo hai vòng: **prefix dài hơn thắng trước**, cùng độ dài
+mới xét **metric hiệu dụng = RouteMetric + InterfaceMetric** (thấp hơn thì
+thắng). Đây là chỗ dễ hiểu lầm: `route add ... metric 1` không phải "ưu tiên
+cao" — con số đó bị *cộng thêm* vào metric của card, nên nó thua route DHCP
+(`RouteMetric 0`) ngay trên cùng card, mà hạ `InterfaceMetric` cũng vô ích vì cả
+hai cùng tụt bằng nhau. Cách chữa: cắm cặp `0.0.0.0/1` + `128.0.0.0/1`, phủ đúng
+bằng `0.0.0.0/0` nhưng dài hơn một bit nên thắng mọi default route (đúng cách
+phần mềm VPN kéo traffic vào tunnel). Route tool thêm vào (`metric 1`) chỉ thắng
+route
 DHCP **trên cùng một card**; nó không tự động thắng một card khác. Máy nào cũng
 có thể có nhiều default route cùng lúc: VPN, Hyper-V / VMware / WSL, Wi-Fi nối
 sang mạng khác, USB 4G.
@@ -387,8 +394,9 @@ Client xử lý theo thang leo, ghi rõ từng bước ra nhật ký:
 | Bậc | Tình huống | Xử lý |
 |-----|-----------|-------|
 | 1 | Card đang thắng **cũng nằm trong lớp mạng của router** | Dời route sang đúng card đó, và ghi nhớ card này cho lần sau |
-| 2 | Card đang thắng ở mạng khác | Hạ `InterfaceMetric` của card LAN xuống `metric_kẻ_thắng − 1 − RouteMetric` |
-| 3 | Kẻ thắng ở metric quá thấp (VPN thường là 1) | Không vượt được — **chỉ đích danh** card, loại card, và việc cần làm |
+| 2 | Mọi tình huống khác, kể cả route DHCP nằm ngay trên card mình | Cắm cặp route `0.0.0.0/1` + `128.0.0.0/1`, thắng bằng độ dài prefix |
+| 3 | Có phần mềm khác (VPN) cũng cắm route `/1` | Hạ `InterfaceMetric` của card LAN xuống `metric_kẻ_thắng − 1 − RouteMetric` |
+| 4 | Vẫn thua | **Chỉ đích danh** card, loại card, và việc cần làm |
 
 Bậc 2 là thay đổi thường trú của hệ điều hành, nên giá trị gốc được lưu vào
 `%ProgramData%\WanSwitch\ifmetric.json` và trả lại nguyên vẹn khi người dùng

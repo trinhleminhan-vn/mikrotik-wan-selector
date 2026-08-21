@@ -57,11 +57,20 @@ KHẮC PHỤC SỰ CỐ
               Linux : tính metric thấp nhất đang có rồi thêm route của
                       mình thấp hơn 1 bậc; nếu card LAN khác đang giữ
                       default route thì dời route sang card đó.
-              macOS : 'route change' không ăn thì xoá hẳn default route
-                      cũ rồi thêm lại (có phục hồi nếu thêm hỏng).
+              Cả hai: không ăn thì cắm cặp route 0.0.0.0/1 và
+                      128.0.0.0/1. Hai nửa này phủ đúng bằng đường mặc
+                      định nhưng "hẹp" hơn một bit, mà nhân hệ điều hành
+                      luôn ưu tiên đường hẹp hơn TRƯỚC khi so metric ->
+                      thắng cả route do router cấp trên chính card mình.
+                      Mạng nội bộ không bị ảnh hưởng.
+              macOS : vẫn không ăn mới xoá hẳn default route cũ rồi thêm
+                      lại (có phục hồi nếu thêm hỏng).
          Không thắng được thì tool CHỈ ĐÍCH DANH card đang chiếm và loại
          của nó (VPN / máy ảo / Wi-Fi / di động) kèm việc cần làm.
-         Hay gặp nhất là VPN toàn tuyến (utun*): phải ngắt VPN.
+         KHÔNG cần rút dây mạng đang dùng: nếu kẻ chiếm nằm ngay trên
+         chính card của bạn thì đó là route do router cấp.
+         Hay gặp nhất là VPN toàn tuyến (utun*): tool vượt được, nhưng
+         vượt xong traffic không còn đi trong tunnel nữa.
          Xem bảng đầy đủ:   ./wanswitch.sh routes
          Gỡ sạch route tool đã thêm:   ./wanswitch.sh reset
 

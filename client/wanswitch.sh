@@ -145,31 +145,51 @@ iface_kind() {
     printf 'vật lý'
 }
 
-# ------------------ Bảng tranh giành default route ---------------------------
+# Hai nửa của toàn bộ không gian địa chỉ. Cộng lại phủ đúng bằng default route
+# nhưng prefix dài hơn một bit -> nhân hệ điều hành chọn chúng trước, bất kể metric.
+SPLIT_HALVES='0.0.0.0/1 128.0.0.0/1'
+
+# Danh sách gateway do tool này tạo ra (không tính gateway mặc định của DHCP).
+managed_gateways() {
+    local i=1
+    while [ "$i" -le "$PROFILE_COUNT" ]; do
+        [ "$(field "$i" DEFAULT)" = "0" ] && field "$i" GW && printf '\n'
+        i=$((i + 1))
+    done
+}
+
+# ------------------ Bảng tranh giành đường ra Internet -----------------------
 # Mỗi dòng: "METRIC|IFACE|GATEWAY". Linux sắp sẵn theo metric.
 default_routes() {
     case "$OS" in
         Linux)
-            ip -4 route show default 2>/dev/null | awk '
-                {
+            ip -4 route show 2>/dev/null | awk '
+                $1=="default" || $1=="0.0.0.0/1" || $1=="128.0.0.0/1" {
+                    pfx  = ($1=="default") ? "0.0.0.0/0" : $1
+                    plen = ($1=="default") ? 0 : 1
                     gw=""; dev=""; m=0
-                    for (i=1; i<=NF; i++) {
+                    for (i=2; i<=NF; i++) {
                         if      ($i=="via")    gw=$(i+1)
                         else if ($i=="dev")    dev=$(i+1)
                         else if ($i=="metric") m=$(i+1)
                     }
-                    if (dev != "") printf "%s|%s|%s\n", m, dev, gw
-                }' | sort -n -t'|' -k1,1
+                    if (dev != "") printf "%s|%s|%s|%s|%s\n", plen, m, dev, gw, pfx
+                }' | sort -t'|' -k1,1nr -k2,2n
             ;;
         Darwin)
             # netstat đổi số cột giữa các bản macOS -> dò cột nào là tên card.
+            # macOS viết tắt prefix: "0/1" và "128.0/1" chứ không ghi đủ.
             netstat -rn -f inet 2>/dev/null | awk '
-                $1=="default" {
+                $1=="default" || $1=="0/1" || $1=="0.0.0.0/1" ||
+                $1=="128.0/1" || $1=="128.0.0.0/1" {
+                    plen = ($1=="default") ? 0 : 1
+                    pfx  = ($1=="default") ? "0.0.0.0/0" : \
+                           (substr($1,1,1)=="0" ? "0.0.0.0/1" : "128.0.0.0/1")
                     dev=""
                     for (i=2; i<=NF; i++)
                         if ($i ~ /^(en|utun|ppp|ipsec|bridge|awdl|llw|gif|stf|anpi|ap|feth)[0-9]+$/) dev=$i
-                    if (dev != "") printf "0|%s|%s\n", dev, $2
-                }'
+                    if (dev != "") printf "%s|0|%s|%s|%s\n", plen, dev, $2, pfx
+                }' | sort -t'|' -k1,1nr
             ;;
     esac
 }
@@ -179,19 +199,19 @@ default_routes() {
 current_gateway() {
     case "$OS" in
         Linux)  ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="via"){print $(i+1); exit}}' ;;
-        Darwin) route -n get default 2>/dev/null | awk '/gateway:/ {print $2; exit}' ;;
+        Darwin) route -n get 1.1.1.1 2>/dev/null | awk '/gateway:/ {print $2; exit}' ;;
     esac
 }
 
 current_iface() {
     case "$OS" in
         Linux)  ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}' ;;
-        Darwin) route -n get default 2>/dev/null | awk '/interface:/ {print $2; exit}' ;;
+        Darwin) route -n get 1.1.1.1 2>/dev/null | awk '/interface:/ {print $2; exit}' ;;
     esac
 }
 
 route_table_lines() {
-    local rows m dev gw mark a_if a_gw
+    local rows plen m dev gw pfx tag mark a_if a_gw
     rows="$(default_routes)"
     if [ -z "$rows" ]; then
         info "Không có default route nào."
@@ -201,22 +221,26 @@ route_table_lines() {
     # bảng — macOS không xếp bảng theo độ ưu tiên.
     a_if="$(current_iface)"; a_gw="$(current_gateway)"
     if [ "$OS" = "Darwin" ]; then
-        info "Bảng default route (macOS không dùng metric — '>' là đường đang đi):"
+        info "Bảng đường ra (prefix dài hơn thắng trước — '>' là đường đang đi):"
     else
-        info "Bảng default route (metric thấp hơn thì thắng):"
+        info "Bảng đường ra (prefix dài hơn thắng trước, cùng độ dài mới xét metric):"
     fi
-    while IFS='|' read -r m dev gw; do
+    while IFS='|' read -r plen m dev gw pfx; do
         [ -n "$dev" ] || continue
         if [ "$dev" = "$a_if" ] && { [ -z "$gw" ] || [ "$gw" = "$a_gw" ]; }; then
             mark='>'
         else
             mark=' '
         fi
+        # /0 là default route thường; /1 thì ghi rõ, vì chính nó giải thích vì
+        # sao một dòng metric cao lại thắng dòng metric thấp.
+        tag=''
+        [ "$plen" = "0" ] || tag="  [$pfx]"
         if [ "$OS" = "Darwin" ]; then
-            printf '%s %-14s %-15s (%s)\n' "$mark" "$dev" "${gw:--}" "$(iface_kind "$dev")"
+            printf '%s %-14s %-15s (%s)%s\n' "$mark" "$dev" "${gw:--}" "$(iface_kind "$dev")" "$tag"
         else
-            printf '%s %-14s %-15s metric %4s  (%s)\n' \
-                   "$mark" "$dev" "${gw:--}" "$m" "$(iface_kind "$dev")"
+            printf '%s %-14s %-15s metric %4s  (%s)%s\n' \
+                   "$mark" "$dev" "${gw:--}" "$m" "$(iface_kind "$dev")" "$tag"
         fi
     done <<EOF
 $rows
@@ -225,9 +249,10 @@ EOF
 
 # Metric thấp nhất trong các default route KHÔNG phải của tool này (Linux)
 lowest_foreign_metric() {
-    local m dev gw best='' i is_mine
-    while IFS='|' read -r m dev gw; do
+    local plen m dev gw pfx best='' i is_mine
+    while IFS='|' read -r plen m dev gw pfx; do
         [ -n "$dev" ] || continue
+        [ "$plen" = "0" ] || continue          # chỉ so metric giữa các default route
         is_mine=0; i=1
         while [ "$i" -le "$PROFILE_COUNT" ]; do
             if [ "$(field "$i" DEFAULT)" = "0" ] && [ "$(field "$i" GW)" = "$gw" ]; then
@@ -245,14 +270,22 @@ EOF
 
 # Ai đang chiếm default route, và người dùng phải làm gì
 explain_winner() {
-    local dev kind gw
+    local dev kind gw mine="${1:-}"
     dev="$(current_iface)"; gw="$(current_gateway)"
     if [ -z "$dev" ]; then
         warn "  Không đọc được bảng định tuyến."
         return
     fi
     kind="$(iface_kind "$dev")"
-    warn "  Card '$dev' [$kind] đang chiếm default route qua ${gw:-?}."
+    warn "  Card '$dev' [$kind] đang chiếm đường ra qua ${gw:-?}."
+    # Cùng một card thì không có "mạng phụ" nào để rút. Bảo người ta rút dây ở
+    # đây là bảo họ tự cắt mạng của chính mình.
+    if [ -n "$mine" ] && [ "$dev" = "$mine" ]; then
+        warn "  Route này nằm NGAY TRÊN card bạn đang dùng, do DHCP của router cấp —"
+        warn "  không phải mạng phụ, đừng rút dây."
+        warn "  Lệnh tự kiểm tra:  ./$(basename "$SELF") routes"
+        return
+    fi
     case "$kind" in
         VPN)
             warn "  VPN toàn tuyến kéo hết traffic vào tunnel — chọn nhà mạng không còn tác"
@@ -296,20 +329,58 @@ index_of_name() {
     return 1
 }
 
+# Vũ khí thật sự: cặp route /1.
+#
+# Cả Linux lẫn macOS đều chọn đường theo LONGEST PREFIX MATCH — so độ dài prefix
+# trước, cùng độ dài mới xét tới metric. Hai nửa /1 phủ đúng bằng 0.0.0.0/0
+# nhưng dài hơn một bit nên thắng MỌI default route, kể cả route do DHCP của
+# router cấp ngay trên chính card mình (ca mà chỉnh metric bó tay: Linux không
+# hạ được dưới 0, macOS thì chỉ cho đúng một default route).
+#
+# Đây cũng là cách phần mềm VPN kéo toàn bộ traffic vào tunnel. Máy trong LAN
+# không bị ảnh hưởng: route on-link của lớp mạng là /24, dài hơn /1 nhiều.
+add_split_routes() {
+    local gw="$1" iface="$2" half
+    for half in $SPLIT_HALVES; do
+        case "$OS" in
+            Linux)
+                ip route replace "$half" via "$gw" dev "$iface" 2>/dev/null || return 1 ;;
+            Darwin)
+                route -n delete -net "$half" >/dev/null 2>&1
+                route -n add -net "$half" "$gw" >/dev/null 2>&1 || return 1 ;;
+        esac
+    done
+    return 0
+}
+
+remove_split_routes() {
+    local gw half
+    for gw in $(managed_gateways); do
+        for half in $SPLIT_HALVES; do
+            case "$OS" in
+                Linux)
+                    while ip -4 route show "$half" 2>/dev/null | grep -q "via $gw "; do
+                        ip route del "$half" via "$gw" 2>/dev/null || break
+                    done ;;
+                Darwin)
+                    route -n delete -net "$half" "$gw" >/dev/null 2>&1 || true ;;
+            esac
+        done
+    done
+}
+
 remove_managed_routes() {
-    local iface="${1:-}" i gw
-    [ "$OS" = "Linux" ] || return 0          # macOS chỉ có 1 default route
-    i=1
-    while [ "$i" -le "$PROFILE_COUNT" ]; do
-        if [ "$(field "$i" DEFAULT)" = "0" ]; then
-            gw="$(field "$i" GW)"
+    local iface="${1:-}" gw
+    if [ "$OS" = "Linux" ]; then            # macOS chỉ có 1 default route
+        for gw in $(managed_gateways); do
             while ip -4 route show default | grep -q "via $gw "; do
                 ip route del default via "$gw" ${iface:+dev "$iface"} 2>/dev/null \
                     || ip route del default via "$gw" 2>/dev/null || break
             done
-        fi
-        i=$((i + 1))
-    done
+        done
+    fi
+    # Route /1 thì cả Linux lẫn macOS đều tự thêm được, nên cả hai đều phải dọn.
+    remove_split_routes
 }
 
 apply_profile() {
@@ -376,7 +447,22 @@ Máy này không nằm trực tiếp trên LAN của router nên không đổi g
         fi
     fi
 
-    # --- Bậc 2 (macOS): xoá hẳn default route cũ rồi thêm lại của mình ---
+    # --- Bậc 2: cặp route /1 — thắng bằng prefix dài hơn, khỏi đụng metric ---
+    # Ca phổ biến nhất và cũng là ca metric bó tay: route mặc định do DHCP của
+    # router cấp nằm ngay trên CÙNG card. Linux không hạ metric xuống dưới 0
+    # được; macOS thì chỉ cho đúng một default route.
+    if [ "$applied" != "$gw" ] && [ "$is_def" = "0" ]; then
+        info "${DIM}  · Đường ra vẫn đi qua ${applied:-?} — chuyển sang cặp route /1.${RST}"
+        if add_split_routes "$gw" "$iface"; then
+            sleep 1
+            applied="$(current_gateway)"
+            [ "$applied" = "$gw" ] && info "${DIM}  · Giành được đường ra bằng cặp route /1.${RST}"
+        else
+            warn "  Không thêm được route /1."
+        fi
+    fi
+
+    # --- Bậc 3 (macOS): xoá hẳn default route cũ rồi thêm lại của mình ---
     # Có phục hồi: thêm không được thì trả lại gateway cũ ngay, không để máy rơi
     # vào tình trạng không có default route.
     if [ "$applied" != "$gw" ] && [ "$OS" = "Darwin" ] && [ "$is_def" = "0" ]; then
@@ -396,7 +482,7 @@ Máy này không nằm trực tiếp trên LAN của router nên không đổi g
         info "  Gateway   : $gw"
     else
         warn "⚠ CHƯA ăn — hệ thống vẫn đi hướng khác (${applied:-không có})."
-        explain_winner
+        explain_winner "$iface"
         info "  Card mạng : $iface ($ip)"
         info "  Gateway   : $gw"
         echo

@@ -47,24 +47,33 @@ DÙNG BẰNG DÒNG LỆNH
 KHẮC PHỤC SỰ CỐ
 ------------------------------------------------------------------------
   "CHƯA ăn — hệ thống vẫn đi hướng khác"
-      -> Máy đang có NHIỀU đường ra Internet cùng lúc, và Windows chấm
-         điểm (metric) đường khác thấp hơn nên đi đường đó. Tool sẽ tự
-         xử lý theo 2 bước:
+      -> Máy đang có NHIỀU đường ra Internet cùng lúc và Windows chọn
+         đường khác. Tool tự xử lý theo 3 bước, ghi rõ từng bước trong
+         ô nhật ký:
               1) Nếu card đang thắng cũng nằm trong lớp mạng của router
                  -> tự dời route sang đúng card đó.
-              2) Nếu không -> tự hạ interface metric của card LAN xuống
-                 đủ thấp để vượt qua.
+              2) Cắm cặp route 0.0.0.0/1 + 128.0.0.0/1. Hai nửa này phủ
+                 đúng bằng đường mặc định nhưng "hẹp" hơn một bit, mà
+                 Windows luôn ưu tiên đường hẹp hơn TRƯỚC khi so điểm
+                 metric -> thắng cả route do router cấp trên chính card
+                 mình. Không hề đụng tới mạng nội bộ.
+              3) Nếu vẫn thua (thường là do có VPN cũng dùng chiêu này)
+                 -> tự hạ interface metric của card LAN xuống đủ thấp.
          Không thắng được thì tool sẽ CHỈ ĐÍCH DANH card đang chiếm và
          loại của nó (VPN / máy ảo / Wi-Fi / di động) kèm việc cần làm.
          Hay gặp nhất:
-              - VPN toàn tuyến (metric 1)  -> phải ngắt VPN, không có
-                cách nào vượt; VPN kéo hết traffic vào tunnel nên chọn
-                nhà mạng cũng vô nghĩa.
+              - VPN toàn tuyến -> tool vượt được, NHƯNG vượt xong là
+                traffic không còn đi trong tunnel nữa. Đang cần VPN cho
+                công việc thì bấm MẶC ĐỊNH để trả đường lại cho VPN.
               - Card ảo Hyper-V / VMware / WSL -> tắt trong Network
                 Connections.
               - Wi-Fi đang nối sang mạng khác -> tắt Wi-Fi.
+         KHÔNG cần rút dây mạng đang dùng. Nếu tool báo kẻ chiếm nằm
+         ngay trên chính card của bạn thì đó là route do router cấp,
+         không phải "mạng phụ" nào cả.
          Xem bảng đầy đủ:   .\WanSwitch.ps1 -Mode status
-         Dấu ">" ở dòng đầu là đường máy đang thực sự đi.
+         Dấu ">" là đường máy đang thực sự đi; dòng nào có [0.0.0.0/1]
+         là route do tool cắm.
 
   Muốn gỡ sạch mọi thứ tool đã đặt
       -> .\WanSwitch.ps1 -Reset

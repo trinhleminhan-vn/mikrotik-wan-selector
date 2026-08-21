@@ -52,6 +52,15 @@ $DefaultProfile  = $Profiles | Where-Object { $_.is_default } | Select-Object -F
 # Chỉ những gateway do tool tạo mới bị gỡ; gateway mặc định là của DHCP, không đụng.
 $ManagedGateways = @($Profiles | Where-Object { -not $_.is_default } | ForEach-Object { $_.gateway })
 
+# Hai nửa của toàn bộ không gian địa chỉ. Cộng lại phủ đúng bằng 0.0.0.0/0
+# nhưng prefix dài hơn một bit -> luôn được chọn trước mọi default route.
+$SplitHalves     = @(
+    @{ Net = '0.0.0.0';   Mask = '128.0.0.0' },
+    @{ Net = '128.0.0.0'; Mask = '128.0.0.0' }
+)
+# Mọi prefix có thể gánh đường ra Internet, dùng khi dựng bảng so sánh.
+$DefaultPrefixes = @('0.0.0.0/0', '0.0.0.0/1', '128.0.0.0/1')
+
 if (-not $Profiles -or $Profiles.Count -eq 0) { throw "profiles.json không có lựa chọn nào." }
 if (-not $LanPrefix) { throw "profiles.json thiếu 'lan_subnet'." }
 
@@ -168,55 +177,121 @@ function Get-AdapterKind {
     return 'vật lý'
 }
 
+function New-RouteInfo {
+    <# Một dòng trong bảng tranh giành đường ra, đã tra sẵn tên card và metric. #>
+    param([Parameter(Mandatory)][int]$IfIndex,
+          [string]$NextHop     = '',
+          [string]$Prefix      = '0.0.0.0/0',
+          [int]   $RouteMetric = 0,
+          [string]$Alias       = '')
+
+    $desc = ''
+    try {
+        $na    = Get-NetAdapter -InterfaceIndex $IfIndex -ErrorAction Stop
+        $Alias = $na.Name
+        $desc  = $na.InterfaceDescription
+    } catch { }
+
+    $ifm = 0
+    try {
+        $ifm = [int](Get-NetIPInterface -InterfaceIndex $IfIndex -AddressFamily IPv4 -ErrorAction Stop).InterfaceMetric
+    } catch { }
+
+    $plen = 0
+    if ($Prefix -match '/(\d+)$') { $plen = [int]$Matches[1] }
+
+    return [pscustomobject]@{
+        IfIndex     = $IfIndex
+        Alias       = $Alias
+        Desc        = $desc
+        Kind        = (Get-AdapterKind "$Alias $desc")
+        NextHop     = $NextHop
+        Prefix      = $Prefix
+        PrefixLen   = $plen
+        RouteMetric = $RouteMetric
+        IfMetric    = $ifm
+        Effective   = ($RouteMetric + $ifm)
+        Managed     = ($ManagedGateways -contains $NextHop)
+    }
+}
+
 function Get-DefaultRoutes {
     <#
-        Toàn cảnh cuộc tranh giành default route: mọi route 0.0.0.0/0 kèm tên
-        card, loại card và metric hiệu dụng, đã sắp xếp — phần tử [0] là đường
-        PC đang thực sự đi.
+        Toàn cảnh cuộc tranh giành đường ra Internet, sắp theo đúng luật Windows
+        dùng để chọn: PREFIX DÀI HƠN THẮNG TRƯỚC, cùng độ dài mới xét tới metric.
+        Phải gom cả /1 chứ không riêng /0, vì tool này (và mọi phần mềm VPN)
+        giành đường bằng cặp route /1.
     #>
     $out = @()
-    foreach ($r in @(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue)) {
-        $alias = [string]$r.InterfaceAlias
-        $desc  = ''
-        try {
-            $na    = Get-NetAdapter -InterfaceIndex $r.ifIndex -ErrorAction Stop
-            $alias = $na.Name
-            $desc  = $na.InterfaceDescription
-        } catch { }
-
-        $ifm = 0
-        try {
-            $ifm = [int](Get-NetIPInterface -InterfaceIndex $r.ifIndex -AddressFamily IPv4 -ErrorAction Stop).InterfaceMetric
-        } catch { }
-
-        $out += [pscustomobject]@{
-            IfIndex     = [int]$r.ifIndex
-            Alias       = $alias
-            Desc        = $desc
-            Kind        = (Get-AdapterKind "$alias $desc")
-            NextHop     = [string]$r.NextHop
-            RouteMetric = [int]$r.RouteMetric
-            IfMetric    = $ifm
-            Effective   = ([int]$r.RouteMetric + $ifm)
-            Managed     = ($ManagedGateways -contains [string]$r.NextHop)
+    foreach ($p in $DefaultPrefixes) {
+        foreach ($r in @(Get-NetRoute -DestinationPrefix $p -ErrorAction SilentlyContinue)) {
+            $out += (New-RouteInfo -IfIndex     ([int]$r.ifIndex) `
+                                   -NextHop     ([string]$r.NextHop) `
+                                   -Prefix      ([string]$r.DestinationPrefix) `
+                                   -RouteMetric ([int]$r.RouteMetric) `
+                                   -Alias       ([string]$r.InterfaceAlias))
         }
     }
-    return @($out | Sort-Object Effective, IfIndex)
+    return @($out | Sort-Object @{ Expression = 'PrefixLen'; Descending = $true }, Effective, IfIndex)
+}
+
+function Get-ActiveRoute {
+    <#
+        Hỏi thẳng bộ định tuyến của Windows xem gói ra Internet chui qua đâu,
+        thay vì tự suy từ bảng metric. Bắt buộc phải hỏi thật: route /1 thắng
+        route /0 nhờ prefix dài hơn dù metric CAO hơn, nhìn metric là đoán sai.
+    #>
+    try {
+        $found = Find-NetRoute -RemoteIPAddress '1.1.1.1' -ErrorAction Stop
+    } catch { return $null }
+
+    $best = $null
+    foreach ($o in @($found)) {
+        if (-not $o.PSObject.Properties['NextHop']) { continue }
+        $hop = [string]$o.NextHop
+        if (-not $hop) { continue }
+        if ($null -eq $best) { $best = $o }
+        # NextHop 0.0.0.0 là route on-link (đích nằm ngay trong LAN), không phải đường ra
+        if ($hop -ne '0.0.0.0') { $best = $o; break }
+    }
+    if ($null -eq $best) { return $null }
+
+    return New-RouteInfo -IfIndex     ([int]$best.ifIndex) `
+                         -NextHop     ([string]$best.NextHop) `
+                         -Prefix      ([string]$best.DestinationPrefix) `
+                         -RouteMetric ([int]$best.RouteMetric)
+}
+
+function Get-WinnerRoute {
+    <# Đường đang thắng: ưu tiên câu trả lời thật của Windows, hết cách mới suy từ metric. #>
+    $act = Get-ActiveRoute
+    if ($act -and $act.NextHop -ne '0.0.0.0') { return $act }
+    $routes = @(Get-DefaultRoutes)
+    if ($routes.Count -gt 0) { return $routes[0] }
+    return $null
 }
 
 function Format-RouteLine {
     param([Parameter(Mandatory)]$R, [switch]$Winner)
     $mark = if ($Winner) { '>' } else { ' ' }
-    return ('{0} {1,-20} {2,-15} metric {3,4}  ({4})' -f
-            $mark, $R.Alias, $R.NextHop, $R.Effective, $R.Kind)
+    # /0 là default route thường; /1 thì ghi rõ, vì chính nó giải thích vì sao
+    # một dòng metric cao lại thắng dòng metric thấp.
+    $tag  = if ($R.Prefix -and $R.Prefix -ne '0.0.0.0/0') { "  [$($R.Prefix)]" } else { '' }
+    return ('{0} {1,-20} {2,-15} metric {3,4}  ({4}){5}' -f
+            $mark, $R.Alias, $R.NextHop, $R.Effective, $R.Kind, $tag)
 }
 
 function Get-RouteTableLines {
     $routes = @(Get-DefaultRoutes)
     if ($routes.Count -eq 0) { return @('Không có default route nào.') }
-    $out = @('Bảng default route (metric thấp hơn thì thắng):')
+    $act = Get-ActiveRoute
+    $out = @('Bảng đường ra (prefix dài hơn thắng trước, cùng độ dài mới xét metric thấp hơn):')
     for ($i = 0; $i -lt $routes.Count; $i++) {
-        $out += (Format-RouteLine -R $routes[$i] -Winner:($i -eq 0))
+        $r   = $routes[$i]
+        $win = if ($act) { ($r.IfIndex -eq $act.IfIndex -and $r.NextHop -eq $act.NextHop -and
+                            $r.Prefix  -eq $act.Prefix) }
+               else       { ($i -eq 0) }
+        $out += (Format-RouteLine -R $r -Winner:$win)
     }
     return $out
 }
@@ -311,16 +386,19 @@ function Set-IfMetric {
 
 # ------------------------------- Route -----------------------------------
 function Get-CurrentProfile {
-    $routes = @(Get-DefaultRoutes)
-    if ($routes.Count -eq 0) { return $null }
-    $best = $routes[0]
-    $Profiles | Where-Object { $_.gateway -eq $best.NextHop } | Select-Object -First 1
+    $win = Get-WinnerRoute
+    if (-not $win) { return $null }
+    $Profiles | Where-Object { $_.gateway -eq $win.NextHop } | Select-Object -First 1
 }
 
 function Remove-ManagedRoutes {
     foreach ($gw in $ManagedGateways) {
         [void](Invoke-Native -Exe 'route' -Arguments @('-p','delete','0.0.0.0','mask','0.0.0.0',$gw))
         [void](Invoke-Native -Exe 'route' -Arguments @(     'delete','0.0.0.0','mask','0.0.0.0',$gw))
+        foreach ($h in $SplitHalves) {
+            [void](Invoke-Native -Exe 'route' -Arguments @('-p','delete',$h.Net,'mask',$h.Mask,$gw))
+            [void](Invoke-Native -Exe 'route' -Arguments @(     'delete',$h.Net,'mask',$h.Mask,$gw))
+        }
     }
 }
 
@@ -333,6 +411,32 @@ function Add-ManagedRoute {
         '-p','add','0.0.0.0','mask','0.0.0.0',$Gateway,
         'metric',[string]$Metric,'if',[string]$IfIndex)
     if ($r.Code -ne 0) { throw "Không thêm được route qua ${Gateway}: $($r.Output)" }
+}
+
+function Add-SplitRoute {
+    <#
+        Vũ khí thật sự của tool: hai nửa 0.0.0.0/1 và 128.0.0.0/1.
+
+        Windows chọn đường theo LONGEST PREFIX MATCH — so độ dài prefix trước,
+        cùng độ dài mới xét metric. Cặp /1 này phủ đúng bằng 0.0.0.0/0 nhưng dài
+        hơn một bit, nên thắng MỌI default route bất kể metric, kể cả route DHCP
+        nằm ngay trên cùng card mình (ca mà hạ interface metric bó tay, vì cả
+        hai cùng dịch chuyển như nhau). Phần mềm VPN kéo toàn bộ traffic vào
+        tunnel cũng bằng đúng cách này.
+
+        Máy trong LAN không bị ảnh hưởng: route on-link của lớp mạng là /24,
+        dài hơn /1 nhiều nên vẫn được ưu tiên.
+    #>
+    param([Parameter(Mandatory)][string]$Gateway,
+          [Parameter(Mandatory)][int]$IfIndex,
+          [int]$Metric = 1)
+
+    foreach ($h in $SplitHalves) {
+        $r = Invoke-Native -Exe 'route' -Arguments @(
+            '-p','add',$h.Net,'mask',$h.Mask,$Gateway,
+            'metric',[string]$Metric,'if',[string]$IfIndex)
+        if ($r.Code -ne 0) { throw "Không thêm được route $($h.Net)/1 qua ${Gateway}: $($r.Output)" }
+    }
 }
 
 function Clear-NetCaches {
@@ -409,7 +513,34 @@ function Set-WanProfile {
         }
     }
 
-    # --------- Bậc 2: hạ interface metric của card mình cho đủ thắng ---------
+    # --------- Bậc 2: cặp route /1 — thắng bằng prefix dài hơn, khỏi đụng metric ---------
+    # Ca PHỔ BIẾN NHẤT và cũng là ca metric bó tay: route mặc định do DHCP của
+    # router cấp nằm NGAY TRÊN CÙNG card, RouteMetric của nó là 0 nên metric hiệu
+    # dụng luôn thấp hơn route tool thêm vào (RouteMetric 1). Hạ interface metric
+    # vô ích vì cả hai cùng tụt như nhau, mà máy chỉ có một card LAN thì cũng
+    # chẳng có mạng phụ nào để ngắt.
+    if (-not $ok) {
+        $win = Get-WinnerRoute
+        $qua = if ($win) { "qua $($win.NextHop)" } else { 'đường khác' }
+        & $note "Đường ra vẫn đi $qua — chuyển sang cặp route /1, thắng bằng độ dài prefix."
+        if ($win -and $win.Kind -eq 'VPN') {
+            & $note ("Lưu ý: cách này kéo traffic ra khỏi VPN '$($win.Alias)'. " +
+                     'Chọn lại chế độ mặc định để trả đường về cho VPN.')
+        }
+        try {
+            Add-SplitRoute -Gateway $gw -IfIndex $adapter.InterfaceIndex
+            Clear-NetCaches
+            $applied = Get-CurrentProfile
+            $ok      = ($applied -and $applied.name -eq $Profile.name)
+            if ($ok) { & $note 'Giành được đường ra bằng cặp route /1.' }
+        } catch {
+            & $note "Không thêm được route /1: $($_.Exception.Message)"
+        }
+    }
+
+    # --------- Bậc 3: hạ interface metric của card mình cho đủ thắng ---------
+    # Chỉ còn cần tới khi có phần mềm khác (thường là VPN) cũng cắm route /1:
+    # cùng độ dài prefix thì quay về đọ metric.
     if (-not $ok) {
         $routes = @(Get-DefaultRoutes)
         $win    = $routes[0]
@@ -443,11 +574,20 @@ function Set-WanProfile {
     # --------- Vẫn thua: chỉ đích danh thủ phạm và việc cần làm ---------
     $why = ''
     if (-not $ok) {
-        $win = @(Get-DefaultRoutes)[0]
+        $win = Get-WinnerRoute
         if ($win) {
-            $why = ("Card '$($win.Alias)' [$($win.Kind)] đang chiếm default route qua " +
-                    "$($win.NextHop) với metric $($win.Effective).")
+            $why = ("Card '$($win.Alias)' [$($win.Kind)] đang chiếm đường ra qua " +
+                    "$($win.NextHop) (prefix $($win.Prefix), metric $($win.Effective)).")
             if ($win.Desc) { $why += "`r`n  Tên đầy đủ: $($win.Desc)" }
+        }
+        if ($win -and $win.IfIndex -eq [int]$adapter.InterfaceIndex) {
+            # Cùng một card thì không có "mạng phụ" nào để rút. Bảo người ta rút
+            # dây ở đây là bảo họ tự cắt mạng của chính mình.
+            $why += ("`r`n  Route này nằm NGAY TRÊN card bạn đang dùng, do DHCP của router cấp — " +
+                     "không phải mạng phụ, đừng rút dây.")
+            $why += ("`r`n  Gỡ tay (CMD quyền Administrator):" +
+                     "`r`n      route delete 0.0.0.0 mask 0.0.0.0 $($win.NextHop)")
+        } elseif ($win) {
             switch ($win.Kind) {
                 'VPN' {
                     $why += ("`r`n  VPN toàn tuyến kéo hết traffic vào tunnel — chọn nhà mạng không " +
